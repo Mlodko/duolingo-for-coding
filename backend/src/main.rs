@@ -1,67 +1,46 @@
 use actix_web::{web, App, HttpServer, Responder, HttpResponse};
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use mongodb::{Client, options::ClientOptions, Database, bson::doc};
-use uuid::Uuid;
+use bcrypt::{DEFAULT_COST, hash, verify};
+mod models;
+use crate::models::*;
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Lesson<'a> {
-    id: Uuid,
-    title: &'a str, // We don't want the title to be mutable/growable, so we can store it in what is essentially a [u8]
-    content: &'a str,
-}
 
-impl <'a> Lesson<'a> {
-    fn new(title : &'a str, content : &'a str) -> Lesson<'a> {
-        Lesson {
-            id : uuid::Uuid::new_v4(),
-            title,
-            content
+
+
+
+
+
+/*
+    fn from_str(json_text : &str, existing_users : &'a [User], existing_lessons : &'a [Lesson]) -> Result<Answer<'a>, serde_json::Error> {
+        let answer_data : AnswerData = serde_json::from_str(json_text)?;
+        let lessons : Vec<&Lesson> = existing_lessons.iter()
+            .filter(|lesson| lesson.id == answer_data.lesson_id)
+            .collect();
+        let matching_lesson = lessons.first();
+
+        if matching_lesson.is_none() {
+            return Err(serde_json::Error::custom("Can't find lesson in provided existing lessons"));
         }
-    }
-}
 
-#[derive(Serialize, Deserialize, Debug)]
-struct User<'a> {
-    #[serde(with = "uuid::serde::simple")]
-    id: Uuid,
-    username: &'a str,
-    progress: i32,
-}
+        let users : Vec<&User> = existing_users.iter()
+            .filter(|user| user.id == answer_data.user_id)
+            .collect();
+        let matching_user = users.first();
 
-impl <'a> User<'a> {
-    fn new(username : &'a str, progress : i32, current_users : &[User]) -> Option<User<'a>> {
-        if current_users.iter()
-        .map(|user| user.username)
-        .any(|existing_username| existing_username == username) {
-            return None;
+        if matching_user.is_none() {
+            return Err(serde_json::Error::custom("Can't find user in provided existing users"));
         }
-        Some(User {
-            id : Uuid::new_v4(),
-            username,
-            progress
+    
+
+        Ok(Answer {
+            lesson : matching_lesson.unwrap(), // there is no way of there being None so it's okay I think 
+            user :  matching_user.unwrap(),
+            answer : answer_data.answer.to_owned()
         })
     }
-}
+*/
 
-#[derive(Debug)]
-struct AnswerData<'a> {
-    lesson : &'a Lesson<'a>,
-    user : &'a User<'a>,
-    answer: &'a str
-}
 
-impl <'a> Serialize for AnswerData<'a> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer {
-        let mut state = serializer.serialize_struct("AnswerData", 3)?;
-        state.serialize_field("lesson", self.lesson.id.to_string().as_str())?;
-        state.serialize_field("user", self.user.id.to_string().as_str())?;
-        state.serialize_field("answer", self.answer)?;
-        state.end()
-            
-    }
-}
 
 /*
 async fn get_lesson(db: web::Data<Database>, id: web::Path<String>) -> impl Responder {
@@ -97,9 +76,9 @@ async fn mainn() -> std::io::Result<()> {
     .await
 }
 */
-
 fn main() {
-    let user = User::new("chuj", 69420, &[]).expect("User with this username already exists");
+    let password_hash = hash("password", DEFAULT_COST).expect("couldn't hash the password");
+    let user = User::new("chuj", password_hash.as_str(),69420, &[]).expect("User with this username already exists");
     dbg!(&user);
     println!("{}", serde_json::to_string(&user).expect("couldn't serialize"));
 
@@ -107,12 +86,13 @@ fn main() {
     dbg!(&lesson);
     println!("{}", serde_json::to_string(&lesson).expect("couldn't serialize"));
 
-    let answer = AnswerData {
+    let answer = Answer {
         lesson : &lesson,
         user : &user,
-        answer : "tak"
+        answer : "tak".to_owned()
     };
 
     dbg!(&answer);
     println!("{}", serde_json::to_string(&answer).expect("couldn't serialize"));
 }
+
