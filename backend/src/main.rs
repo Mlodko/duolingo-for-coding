@@ -2,7 +2,7 @@ use actix_web::{web, App, HttpServer, Responder, HttpResponse};
 use mongodb::{Client, options::ClientOptions, Database, bson::doc};
 use bcrypt::{DEFAULT_COST, hash, verify};
 mod models;
-use crate::models::*;
+mod server;
 
 
 
@@ -76,23 +76,8 @@ async fn mainn() -> std::io::Result<()> {
     .await
 }
 */
-fn main() {
-    let password_hash = hash("password", DEFAULT_COST).expect("couldn't hash the password");
-    let user = User::new("chuj", password_hash.as_str(),69420, &[]).expect("User with this username already exists");
-    dbg!(&user);
-    println!("{}", serde_json::to_string(&user).expect("couldn't serialize"));
-
-    let lesson = Lesson::new("Państwo Izrael", "jebać");
-    dbg!(&lesson);
-    println!("{}", serde_json::to_string(&lesson).expect("couldn't serialize"));
-
-    let answer = Answer {
-        lesson : &lesson,
-        user : &user,
-        answer : "tak".to_owned()
-    };
-
-    dbg!(&answer);
-    println!("{}", serde_json::to_string(&answer).expect("couldn't serialize"));
+#[tokio::main]
+async fn main() {
+    server::start().await;
 }
 
