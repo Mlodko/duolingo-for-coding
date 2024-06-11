@@ -1,0 +1,56 @@
+import React, { useState } from 'react';
+import './LoginSignup.css';
+
+import user_icon from '../Assets/person.png';
+import email_icon from '../Assets/email.png';
+import password_icon from '../Assets/password.png';
+
+const LoginSignup = () => {
+  const [isSignup, setIsSignup] = useState(true);
+
+  const toggleForm = () => {
+    setIsSignup(!isSignup);
+  };
+
+  return (
+    <div className="login-signup-container">
+      <div className="form-container">
+        <div className="header">
+          <div className="text">{isSignup ? 'Sign up' : 'Login'}</div>
+          <div className="underline"></div>
+        </div>
+        <div className="inputs">
+          {isSignup && (
+            <div className="input">
+              <img src={user_icon} alt="User Icon" />
+              <input type="text" placeholder="Nickname" />
+            </div>
+          )}
+          <div className="input">
+            <img src={email_icon} alt="Email Icon" />
+            <input type="email" placeholder="Email" />
+          </div>
+          <div className="input">
+            <img src={password_icon} alt="Password Icon" />
+            <input type="password" placeholder="Password" />
+          </div>
+        </div>
+        {!isSignup && (
+          <div className="forgot-password">
+            Lost Password? <span>Click Here!</span>
+          </div>
+        )}
+        <div className="submit-container">
+          <div className="submit">{isSignup ? 'Sign up' : 'Login'}</div>
+        </div>
+        <div className="toggle-container">
+          <button onClick={toggleForm}>
+            {isSignup ? 'Switch to Login' : 'Switch to Signup'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default LoginSignup;
