@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import './LoginSignup.css';
 import RecaptchaScreen from '../Auth/ReCaptchaScreen'; // Adjusted import path
 import { backendService } from '../../services/backendService'; // Adjusted path if necessary
+//import logo from '../Assets/logo.svg'
 
 import user_icon from '../Assets/person.png';
 import email_icon from '../Assets/email.png';
@@ -61,6 +62,9 @@ const LoginSignup = () => {
     <div className="login-signup-container">
       {!showRecaptcha ? (
         <div className="form-container">
+          {/* <div className="logo-container">
+            <img src={logo} alt="Logo" className="logo" />
+          </div> */}
           <div className="header">
             <div className="text">{isSignup ? 'Sign up' : 'Login'}</div>
             <div className="underline"></div>
