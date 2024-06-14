@@ -3,7 +3,8 @@ use mongodb::{Client, options::ClientOptions, Database, bson::doc};
 use bcrypt::{DEFAULT_COST, hash, verify};
 mod models;
 mod server;
-
+use sqlx::mysql::MySqlPoolOptions;
+use std::env;
 
 
 
@@ -76,8 +77,24 @@ async fn mainn() -> std::io::Result<()> {
     .await
 }
 */
-#[tokio::main]
-async fn main() {
-    server::start().await;
+async fn main() -> Result<(), sqlx::Error> {
+    // Pobierz URL bazy danych z zmiennej środowiskowej
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+    // Utwórz pulę połączeń
+    let pool = MySqlPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await?;
+
+    // Przykładowe zapytanie
+    let row: (i64,) = sqlx::query_as("SELECT ?")
+        .bind(150_i64)
+        .fetch_one(&pool)
+        .await?;
+
+    println!("Fetched row: {:?}", row);
+
+    Ok(())
 }
 
