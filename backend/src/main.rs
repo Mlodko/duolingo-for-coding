@@ -1,11 +1,15 @@
-use actix_web::{web, App, HttpServer, Responder, HttpResponse};
-use mongodb::{Client, options::ClientOptions, Database, bson::doc};
-use bcrypt::{DEFAULT_COST, hash, verify};
+//use actix_web::{web, App, HttpServer, Responder, HttpResponse};
+//use mongodb::{Client, options::ClientOptions, Database, bson::doc};
+//use bcrypt::{DEFAULT_COST, hash, verify};
 mod models;
 mod server;
 
 
 
+#[tokio::main]
+async fn main() {
+    server::start().await;
+}
 
 
 
@@ -76,8 +80,4 @@ async fn mainn() -> std::io::Result<()> {
     .await
 }
 */
-#[tokio::main]
-async fn main() {
-    server::start().await;
-}
 

@@ -15,3 +15,5 @@ serde = {"version" = "1.0", features = ["derive"]} # For serialization
 mongodb = "2.8.2" # For MongoDB
 uuid = "1.8.0"
 bcrypt = "0.15" # For password hashing
+regex = "1.10.5"
+serde_with = "3.8.1"
