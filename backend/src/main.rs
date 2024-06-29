@@ -78,22 +78,29 @@ async fn mainn() -> std::io::Result<()> {
 }
 */
 async fn main() -> Result<(), sqlx::Error> {
-    // Pobierz URL bazy danych z zmiennej środowiskowej
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        // Pobierz URL bazy danych z zmiennej środowiskowej
+        let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
-    // Utwórz pulę połączeń
-    let pool = MySqlPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
+        // Utwórz pulę połączeń
+        let pool = MySqlPoolOptions::new()
+            .max_connections(5)
+            .connect(&database_url)
+            .await?;
+    
+        // Tworzenie tabeli
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL UNIQUE
+            )"
+        )
+        .execute(&pool)
         .await?;
-
-    // Przykładowe zapytanie
-    let row: (i64,) = sqlx::query_as("SELECT ?")
-        .bind(150_i64)
-        .fetch_one(&pool)
-        .await?;
-
-    println!("Fetched row: {:?}", row);
+    
+        println!("Table created");
+    
+        Ok(())
 
     Ok(())
 }
