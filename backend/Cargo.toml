@@ -16,3 +16,5 @@ mongodb = "2.8.2" # For MongoDB
 uuid = "1.8.0"
 sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "mysql"] }
 bcrypt = "0.15" # For password hashing
+dotenv = "0.15.0"
+rand = "0.8"
