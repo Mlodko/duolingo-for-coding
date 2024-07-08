@@ -5,6 +5,7 @@ use uuid::Uuid;
 use std::fmt;
 use serde_json::Value;
 use regex::Regex;
+use std::any::type_name;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -173,67 +174,44 @@ impl <'a> User<'a> {
     }
 }
 
-pub trait AnswerContent {
-    type Item;
-    fn serialize(&self) -> Result<String, serde_json::Error>;
-    fn deserialize(json: &str) -> Result<Self::Item, serde_json::Error>; 
-}
 
-#[derive(Serialize, Deserialize, Debug)]
-struct MultipleChoice {
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct MultipleChoice {
     pub selected_answers_indices: Vec<u32>
 }
 
 
-impl AnswerContent for MultipleChoice {
-    type Item = MultipleChoice;
-
-    fn serialize(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string(&self)
-    }
-
-    fn deserialize(json: &str) -> Result<MultipleChoice, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct OpenQuestion {
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct OpenQuestion {
     pub content: String,
 }
 
-impl AnswerContent for OpenQuestion {
-    type Item = OpenQuestion;
 
-    fn serialize(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string(&self)
-    }
-
-    fn deserialize(json: &str) -> Result<Self::Item, serde_json::Error> {
-        serde_json::from_str(json)
-    }
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub enum AnswerContent {
+    MultipleChoice(MultipleChoice),
+    OpenQuestion(OpenQuestion)
 }
 
-pub trait AnswerState {}
 
-struct Solved;
-impl AnswerState for Solved {}
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub enum AnswerState {
+    Solved,
+    Unsolved
+}
 
-struct Unsolved;
-impl AnswerState for Unsolved {}
-
-#[derive(Debug, Deserialize)]
-pub struct Answer<Type: AnswerContent, State: AnswerState> {
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct Answer {
     #[serde(with = "uuid::serde::simple")]
     pub lesson_id : Uuid,
     #[serde(with = "uuid::serde::simple")]
     pub user_id : Uuid,
-    pub content: Option<Type>,
-    #[serde(skip)]
-    state: State
+    pub content: Option<AnswerContent>,
+    state: AnswerState
 }
 
-impl <T: AnswerContent> Serialize for Answer<T, Solved> {
+/*
+impl Serialize for Answer {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer {
@@ -241,56 +219,45 @@ impl <T: AnswerContent> Serialize for Answer<T, Solved> {
         state.serialize_field("lesson_id", self.lesson_id.to_string().as_str())?;
         state.serialize_field("user_id", self.user_id.to_string().as_str())?;
 
-        let serialized_content = self.content.as_ref().unwrap().serialize();
-        if let Err(err) = serialized_content {
-            return Err(serde::ser::Error::custom(err.to_string()))
-        }
-        state.serialize_field("content", serialized_content.unwrap().as_str());
-        state.end()   
-    }
-}
+        let serialized_content = serde_json::to_string(&self.content);
+        match serialized_content {
+            Ok(value) => {
+                state.serialize_field("content", value.as_str())?;
+            }
 
-// If the answer is unsolved don't serialize content
-impl <T: AnswerContent> Serialize for Answer<T, Unsolved> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer {
-        let mut state = serializer.serialize_struct("AnswerData", 3)?;
-        state.serialize_field("lesson", self.lesson_id.to_string().as_str())?;
-        state.serialize_field("user", self.user_id.to_string().as_str())?;
+            Err(err) => return Err(S::Error::custom(err.to_string()))
+        }
+        state.serialize_field("state", &self.state)?;
         state.end()
     }
 }
+*/
 
 // Remember to use this, not serde_json::from_str()!
-impl<'a, 'de, T: AnswerContent + Deserialize<'de>, State: AnswerState> Answer<T, State> {
-    pub fn deserialize(json : &str) -> Result<Answer<T, State>, serde_json::Error> {
-        todo!()
+impl Answer {
+    pub fn deserialize<'de>(json : &'de str) -> Result<Answer, serde_json::Error> {
+        serde_json::from_str(json)
     }
 
-    pub fn serialize(&self) -> Result<String, serde_json::Error>
-        where
-            Answer<T, State>: Serialize{
+    pub fn serialize(&self) -> Result<String, serde_json::Error>{
         serde_json::to_string(self)
     }
-}
 
-impl <T: AnswerContent> Answer<T, Unsolved> {
-    pub fn solve(&self, content: T) -> Answer<T, Solved> {
+    pub fn solve(&self, content: AnswerContent) -> Answer {
         Answer {
             user_id: self.user_id,
             lesson_id: self.lesson_id,
             content: Some(content),
-            state: Solved
+            state: AnswerState::Solved
         }
     }
 
-    pub fn new(user_id: Uuid, lesson_id: Uuid) -> Answer<T, Unsolved> {
+    pub fn new(user_id: Uuid, lesson_id: Uuid) -> Answer {
         Answer {
             lesson_id,
             user_id,
             content: None,
-            state: Unsolved
+            state: AnswerState::Unsolved
         }
     }
 }
@@ -412,6 +379,14 @@ mod tests {
     
     #[test]
     fn test_answer_serialization() {
-        todo!("Answer deserialization not implemented");
+        let original = Answer::new(Uuid::new_v4(), Uuid::new_v4()).solve(
+            AnswerContent::OpenQuestion( OpenQuestion{content: "AAAAAAAAAAA".to_string()})
+        );
+
+        let json = Answer::serialize(&original).expect("Couldn't serialize");
+        dbg!(&json);
+        let deserialized = Answer::deserialize(json.as_str()).expect("Couldn't deserialize");
+
+        assert!(original == deserialized);
     }
 }
