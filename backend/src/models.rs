@@ -1,12 +1,33 @@
-use serde::ser::{Error, SerializeSeq};
-use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
-use serde::de::{self, DeserializeSeed, Deserializer, Visitor, MapAccess};
+use serde::ser::SerializeSeq;
+use serde::{Deserialize, Serialize, Serializer};
 use uuid::Uuid;
-use std::fmt;
-use serde_json::Value;
 use regex::Regex;
-use std::any::type_name;
 
+
+mod serde_uuid_vec {
+    use serde::{self, Serializer, Deserializer, Serialize, Deserialize};
+    use uuid::Uuid;
+
+    pub fn serialize<S>(vec: &Vec<Uuid>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let vec_string : Vec<String> = vec.iter()
+            .map(|id| id.to_string())
+            .collect();
+        vec_string.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Uuid>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let vec_string : Vec<String> = Vec::deserialize(deserializer)?;
+        vec_string.iter()
+            .map(|id_str| Uuid::parse_str(id_str).map_err(serde::de::Error::custom))
+            .collect() 
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Lesson<'a> {
@@ -67,18 +88,7 @@ impl UserLevel {
     }
 }
 
-fn serialize_users_to_ids<'a, S>(users: &Vec<&'a User<'a>>, serializer: S) -> Result<S::Ok, S::Error>
-where S: Serializer,
-{
-    let mut seq = serializer.serialize_seq(Some(users.len()))?;
-    for user in users {
-        seq.serialize_element(&user.id.to_string().as_str())?;
-    }
-    seq.end()
-}
-
-
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 #[serde_with::skip_serializing_none]
 pub struct User<'a> {
     #[serde(with="uuid::serde::simple")]
@@ -90,8 +100,8 @@ pub struct User<'a> {
     pub phone: Option<&'a str>,
     pub bio: Option<&'a str>,
     // pub avatar: ?
-    #[serde(serialize_with = "serialize_users_to_ids")]
-    pub friends: Vec<&'a User<'a>>,
+    #[serde(with="serde_uuid_vec")]
+    pub friends: Vec<Uuid>,
     pub level: UserLevel,
     pub progress: UserProgress,
     pub auth_token: Option<Uuid> // Only if logged in
@@ -113,9 +123,6 @@ impl <'a> User<'a> {
         serde_json::to_string(self)
     }
 
-    pub fn deserialize(json: &str) -> Result<User, serde_json::Error> {
-        unimplemented!("Afaik there is no need to ever deserialize User on the server's side. Changes should be made via the UserRequest struct - Mlodko");
-    }
 
     pub fn new(username : &'a str, password_hash : &'a str, email: Option<&'a str>, phone: Option<&'a str>,  current_users : &[User]) -> Result<User<'a>, UserError> {
         if current_users.iter()
@@ -356,7 +363,6 @@ mod tests {
 
     #[test]
     fn test_user_serialization() {
-        todo!("User serialization not implemented");
         let password_hash = hash("password", DEFAULT_COST).unwrap();
         let user1 = User::new("testuser", &password_hash, Some("test@test.com"), Some("123456789"), &[]).unwrap();
         let password_hash = hash("qwerty", DEFAULT_COST).unwrap();
@@ -367,14 +373,13 @@ mod tests {
             email: Some("test2@test.com"),
             phone: None,
             bio: Some("test bio"),
-            friends: vec![&user1],
+            friends: vec![user1.id],
             level: UserLevel::new(),
             progress: UserProgress::new(),
             auth_token: Some(Uuid::new_v4())
             };
-        if let Ok(serialized) = user2.serialize() {
-            todo!()
-        }
+        
+        let json = user2.serialize().expect("Couldn't serialize");
     }
     
     #[test]
