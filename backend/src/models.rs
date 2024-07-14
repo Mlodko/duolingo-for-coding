@@ -50,14 +50,16 @@ pub struct Task<'a> {
     pub id: Uuid,
     pub title: &'a str, // We don't want the title to be mutable/growable, so we can store it in what is essentially a [u8]
     pub content: TaskContent,
+    pub tags: Vec<&'a str>
 }
 
 impl <'a> Task<'a> {
-    pub fn new(title : &'a str, content : TaskContent) -> Task<'a> {
+    pub fn new(title : &'a str, content : TaskContent, tags: Vec<&'a str>) -> Task<'a> {
         Task {
             id : uuid::Uuid::new_v4(),
             title,
-            content
+            content,
+            tags
         }
     }
 
@@ -268,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_task_serialization() {
-        let task = Task::new("Test task", TaskContent::Open(OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() }));
+        let task = Task::new("Test task", TaskContent::Open(OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() }), vec!["AI", "AGI", "begginer"]);
         let serialized = task.serialize().unwrap();
         let deserialized = Task::deserialize(&serialized).unwrap();
 
