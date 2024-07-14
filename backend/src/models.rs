@@ -1,5 +1,4 @@
-use serde::ser::SerializeSeq;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use regex::Regex;
 
@@ -29,17 +28,33 @@ mod serde_uuid_vec {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Lesson<'a> {
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct OpenQuestionTask {
+    content: String
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct MultipleChoiceTask {
+    choices: Vec<String>
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub enum TaskContent {
+    Open(OpenQuestionTask),
+    MultipleChoice(MultipleChoiceTask)
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Task<'a> {
     #[serde(with = "uuid::serde::simple")]
     pub id: Uuid,
     pub title: &'a str, // We don't want the title to be mutable/growable, so we can store it in what is essentially a [u8]
-    pub content: &'a str,
+    pub content: TaskContent,
 }
 
-impl <'a> Lesson<'a> {
-    pub fn new(title : &'a str, content : &'a str) -> Lesson<'a> {
-        Lesson {
+impl <'a> Task<'a> {
+    pub fn new(title : &'a str, content : TaskContent) -> Task<'a> {
+        Task {
             id : uuid::Uuid::new_v4(),
             title,
             content
@@ -50,7 +65,7 @@ impl <'a> Lesson<'a> {
         serde_json::to_string(self)
     }
 
-    pub fn deserialize(json: &str) -> Result<Lesson, serde_json::Error> {
+    pub fn deserialize(json: &str) -> Result<Task, serde_json::Error> {
         serde_json::from_str(json)
     }
 }
@@ -61,7 +76,7 @@ pub struct UserProgress {
     unit: u32,      // Beginner/intermediate/UI/A&DS
     sector: u32,    // Syntax/loops/objects/inheritance
     level: u32,     // Loops -> for/while/do while
-    lesson: u32     // 5-10 tasks
+    task: u32     // 5-10 tasks
 }
 
 impl UserProgress {
@@ -71,7 +86,7 @@ impl UserProgress {
             unit: 0,
             sector: 0,
             level: 0,
-            lesson: 0
+            task: 0
         }
     }
 }
@@ -183,21 +198,21 @@ impl <'a> User<'a> {
 
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct MultipleChoice {
+pub struct MultipleChoiceAnswer {
     pub selected_answers_indices: Vec<u32>
 }
 
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct OpenQuestion {
+pub struct OpenQuestionAnswer {
     pub content: String,
 }
 
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum AnswerContent {
-    MultipleChoice(MultipleChoice),
-    OpenQuestion(OpenQuestion)
+    MultipleChoice(MultipleChoiceAnswer),
+    OpenQuestion(OpenQuestionAnswer)
 }
 
 
@@ -210,35 +225,12 @@ pub enum AnswerState {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Answer {
     #[serde(with = "uuid::serde::simple")]
-    pub lesson_id : Uuid,
+    pub task_id : Uuid,
     #[serde(with = "uuid::serde::simple")]
     pub user_id : Uuid,
     pub content: Option<AnswerContent>,
     state: AnswerState
 }
-
-/*
-impl Serialize for Answer {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer {
-        let mut state = serializer.serialize_struct("AnswerData", 3)?;
-        state.serialize_field("lesson_id", self.lesson_id.to_string().as_str())?;
-        state.serialize_field("user_id", self.user_id.to_string().as_str())?;
-
-        let serialized_content = serde_json::to_string(&self.content);
-        match serialized_content {
-            Ok(value) => {
-                state.serialize_field("content", value.as_str())?;
-            }
-
-            Err(err) => return Err(S::Error::custom(err.to_string()))
-        }
-        state.serialize_field("state", &self.state)?;
-        state.end()
-    }
-}
-*/
 
 // Remember to use this, not serde_json::from_str()!
 impl Answer {
@@ -253,15 +245,15 @@ impl Answer {
     pub fn solve(&self, content: AnswerContent) -> Answer {
         Answer {
             user_id: self.user_id,
-            lesson_id: self.lesson_id,
+            task_id: self.task_id,
             content: Some(content),
             state: AnswerState::Solved
         }
     }
 
-    pub fn new(user_id: Uuid, lesson_id: Uuid) -> Answer {
+    pub fn new(user_id: Uuid, task_id: Uuid) -> Answer {
         Answer {
-            lesson_id,
+            task_id,
             user_id,
             content: None,
             state: AnswerState::Unsolved
@@ -269,96 +261,18 @@ impl Answer {
     }
 }
 
-/*
-struct AnswerSeed<'a> {
-    users : &'a [&'a User<'a>],
-    lessons : &'a [&'a Lesson<'a>]
-}
-
-impl <'de, 'a> DeserializeSeed<'de> for AnswerSeed<'a> {
-    type Value = Answer<'a>;
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-        where
-            D: Deserializer<'de> {
-        struct AnswerVisitor<'a> {
-            lesson_id: Option<Uuid>,
-            user_id: Option<Uuid>,
-            answer: Option<String>,
-            lessons: &'a [&'a Lesson<'a>],
-            users : &'a [&'a User<'a>]
-        }
-
-        impl <'de, 'a> Visitor<'de> for AnswerVisitor<'a> {
-            type Value = Answer<'a>;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("struct Answer")
-            }
-
-            fn visit_map<V>(mut self, mut map: V) -> Result<Answer<'a>, V::Error>
-            where
-                V: MapAccess<'de>,
-            {
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "lesson" => {
-                            let lesson_id = map.next_value::<Uuid>()?;
-                            self.lesson_id = Some(lesson_id);
-                        }
-                        "user" => {
-                            let user_id = map.next_value::<Uuid>()?;
-                            self.user_id = Some(user_id);
-                        }
-                        "answer" => {
-                            let answer = map.next_value::<String>()?;
-                            self.answer = Some(answer);
-                        }
-                        _ => return Err(de::Error::unknown_field(&key, FIELDS)),
-                    }
-                }
-
-                let lesson = self.lessons.iter()
-                    .find(|lesson| lesson.id == self.lesson_id.unwrap())
-                    .ok_or_else(|| de::Error::missing_field("lesson"))?;
-                let user = self.users.iter()
-                    .find(|user| user.id == self.user_id.unwrap())
-                    .ok_or_else(|| de::Error::missing_field("user"))?;
-                let answer = self.answer.take()
-                    .ok_or_else(|| de::Error::missing_field("answer"))?;
-
-                Ok(Answer {
-                    lesson,
-                    user,
-                    answer
-                })
-            }
-        }
-        const FIELDS: &[&str] = &["lesson", "user", "answer"];
-        deserializer.deserialize_struct("Answer", FIELDS, AnswerVisitor {
-            lesson_id: None,
-            user_id: None,
-            answer: None,
-            lessons: self.lessons,
-            users: self.users,
-        })
-    }
-}
-*/
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use bcrypt::{hash, DEFAULT_COST};
 
     #[test]
-    fn test_lesson_serialization() {
-        let lesson = Lesson::new("Test Lesson", "Test Content");
-        let serialized = lesson.serialize().unwrap();
-        let deserialized = Lesson::deserialize(&serialized).unwrap();
+    fn test_task_serialization() {
+        let task = Task::new("Test task", TaskContent::Open(OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() }));
+        let serialized = task.serialize().unwrap();
+        let deserialized = Task::deserialize(&serialized).unwrap();
 
-        assert_eq!(lesson.id, deserialized.id);
-        assert_eq!(lesson.title, deserialized.title);
-        assert_eq!(lesson.content, deserialized.content);
+        assert_eq!(task, deserialized);
     }
 
     #[test]
@@ -379,19 +293,19 @@ mod tests {
             auth_token: Some(Uuid::new_v4())
             };
         
-        let json = user2.serialize().expect("Couldn't serialize");
+        user2.serialize().expect("Couldn't serialize");
     }
     
     #[test]
     fn test_answer_serialization() {
         let original = Answer::new(Uuid::new_v4(), Uuid::new_v4()).solve(
-            AnswerContent::OpenQuestion( OpenQuestion{content: "AAAAAAAAAAA".to_string()})
+            AnswerContent::OpenQuestion( OpenQuestionAnswer{content: "AAAAAAAAAAA".to_string()})
         );
 
         let json = Answer::serialize(&original).expect("Couldn't serialize");
         dbg!(&json);
         let deserialized = Answer::deserialize(json.as_str()).expect("Couldn't deserialize");
 
-        assert!(original == deserialized);
+        assert_eq!(original, deserialized);
     }
 }
