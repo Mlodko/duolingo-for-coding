@@ -1,10 +1,19 @@
+
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Router};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use sqlx::{Acquire, MySqlPool};
+use crate::database;
 
 
 const IP_ADDRESS : &str = "127.0.0.1";
 const PORT : u32 = 8080;
 
+
+
 pub async fn start() {
+    let db_pool = database::initialize_db_pool().await;
+
     let app = Router::new()
         .route("/test", get(test))
         .route("/user", get(login_user).post(register_user))

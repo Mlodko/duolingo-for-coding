@@ -3,6 +3,7 @@
 //use bcrypt::{DEFAULT_COST, hash, verify};
 mod models;
 mod server;
+mod database;
 
 
 
