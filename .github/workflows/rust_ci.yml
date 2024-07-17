@@ -16,6 +16,7 @@ jobs:
       mysql:
         image: mysql:5.7
         env:
+          MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: duolingodb
         ports:
           - 3306:3306
@@ -43,7 +44,7 @@ jobs:
 
       - name: Import database schema
         run: |
-          mysql -h 127.0.0.1 -u duolingo-app -p= duolingodb < backend/all_databases.sql
+          mysql -h 127.0.0.1 -uroot -proot duolingodb < backend/all_databases.sql
 
       - name: Navigate to backend and run tests
         run: |
