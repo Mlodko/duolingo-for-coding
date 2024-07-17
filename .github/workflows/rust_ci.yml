@@ -16,6 +16,7 @@ jobs:
       mysql:
         image: mysql:8.0.37
         env:
+          DATABASE_URL: mysql://duolingo-app:duolingo@localhost:3306/duolingodb
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: duolingodb
         ports:
