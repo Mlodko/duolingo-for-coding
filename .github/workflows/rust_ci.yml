@@ -12,6 +12,19 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_DATABASE: duolingodb
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -20,6 +33,17 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+
+      - name: Wait for MySQL to be ready
+        run: |
+          until mysqladmin ping -h 127.0.0.1 --silent; do
+            echo "Waiting for MySQL to be ready..."
+            sleep 5
+          done
+
+      - name: Import database schema
+        run: |
+          mysql -h 127.0.0.1 -u duolingo-app -p= duolingodb < backend/all_databases.sql
 
       - name: Navigate to backend and run tests
         run: |
