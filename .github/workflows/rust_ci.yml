@@ -16,7 +16,6 @@ jobs:
       mysql:
         image: mysql:8.0.37
         env:
-          DATABASE_URL: mysql://duolingo-app:duolingo@localhost:3306/duolingodb
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: duolingodb
         ports:
@@ -48,6 +47,8 @@ jobs:
           mysql -h 127.0.0.1 -uroot -proot duolingodb < backend/all_databases.sql
 
       - name: Navigate to backend and run tests
+        env: 
+          DATABASE_URL: mysql://root:root@127.0.0.1:3306/duolingodb
         run: |
           cd backend
           cargo test
