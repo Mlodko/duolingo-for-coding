@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
+use sqlx::MySqlPool;
 use uuid::Uuid;
 use regex::Regex;
-
+use sqlx::MySqlConnection;
+use sqlx::FromRow;
 
 mod serde_uuid_vec {
     use serde::{self, Serializer, Deserializer, Serialize, Deserialize};
@@ -45,16 +47,83 @@ pub enum TaskContent {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Tag {
+    pub id: Uuid,
+    pub name: String
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Task<'a> {
     #[serde(with = "uuid::serde::simple")]
     pub id: Uuid,
     pub title: &'a str, // We don't want the title to be mutable/growable, so we can store it in what is essentially a [u8]
     pub content: TaskContent,
-    pub tags: Vec<&'a str>
+    pub tags: Vec<Tag>
+}
+
+impl Tag {
+    pub fn new(name: String) -> Tag {
+        Tag {
+            id: uuid::Uuid::new_v4(),
+            name
+        }
+    }
 }
 
 impl <'a> Task<'a> {
-    pub fn new(title : &'a str, content : TaskContent, tags: Vec<&'a str>) -> Task<'a> {
+    
+    async fn insert_task(&self, pool: &MySqlPool) -> Result<(), sqlx::Error> {
+        let content_json = serde_json::to_string(&self.content).expect("Couldn't serialize content");
+        let mut transaction = pool.begin().await?;
+        // Insert the task into the database
+        sqlx::query!(
+            r#"INSERT INTO tasks (id, title, content) VALUES (?, ?, ?)"#,
+            self.id.to_string(),
+            self.title,
+            content_json
+        )
+        .execute(&mut *transaction)
+        .await?;
+        
+        // Insert the tags into the database
+        for tag in &self.tags {
+            // Check if tag already exists
+            let tag_id = match sqlx::query!(
+                "SELECT id FROM tags WHERE name = ?",
+                tag.name
+            )
+            .fetch_optional(pool)
+            .await? {
+                Some(record) => Uuid::parse_str(&record.id).unwrap(),
+                None => {
+                    // Insert the tag into the database
+                    sqlx::query!(
+                        "INSERT INTO tags (id, name) VALUES (?, ?)",
+                        tag.id.to_string(),
+                        tag.name
+                    )
+                    .execute(&mut *transaction)
+                    .await?;
+                    tag.id
+                }
+            };
+            
+            // Insert the task-tag relation into the database
+            sqlx::query!(
+                "INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)",
+                self.id.to_string(),
+                tag_id.to_string()
+            )
+            .execute(&mut *transaction)
+            .await?;
+        }
+        
+        transaction.rollback().await?;
+        
+        Ok(())
+    }
+    
+    pub fn new(title : &'a str, content : TaskContent, tags: Vec<Tag>) -> Task<'a> {
         Task {
             id : uuid::Uuid::new_v4(),
             title,
@@ -267,13 +336,13 @@ impl Answer {
 mod tests {
     use super::*;
     use bcrypt::{hash, DEFAULT_COST};
+    use crate::database;
 
     #[test]
     fn test_task_serialization() {
-        let task = Task::new("Test task", TaskContent::Open(OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() }), vec!["AI", "AGI", "begginer"]);
+        let task = Task::new("Test task", TaskContent::Open(OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() }), vec![Tag::new("AI".to_string()), Tag::new("AGI".to_string())]);
         let serialized = task.serialize().unwrap();
         let deserialized = Task::deserialize(&serialized).unwrap();
-
         assert_eq!(task, deserialized);
     }
 
@@ -309,5 +378,17 @@ mod tests {
         let deserialized = Answer::deserialize(json.as_str()).expect("Couldn't deserialize");
 
         assert_eq!(original, deserialized);
+    }
+    
+    #[tokio::test]
+    async fn test_task_db_insertion() {
+        let binding = database::initialize_db_pool().await;
+        let pool = binding.lock().await;
+        let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
+        let tags = vec![Tag::new("AI".to_string()), Tag::new("AGI".to_string())];
+        let task = Task::new("Test task", TaskContent::Open(content), tags);
+        
+        let result = task.insert_task(&pool).await;
+        assert!(result.is_ok());
     }
 }
