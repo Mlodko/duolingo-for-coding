@@ -48,7 +48,7 @@ jobs:
 
       - name: Navigate to backend and run tests
         env: 
-          DATABASE_URL: mysql://duolingo-app:duolingo@127.0.0.1:3306/duolingodb
+          DATABASE_URL: mysql://root:root@127.0.0.1:3306/duolingodb
         run: |
           cd backend
           cargo test
