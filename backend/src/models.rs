@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 use uuid::Uuid;
 use regex::Regex;
-use sqlx::MySqlConnection;
-use sqlx::FromRow;
+use sqlx::{FromRow, query_as, query};
+use std::collections::HashSet;
 
 mod serde_uuid_vec {
     use serde::{self, Serializer, Deserializer, Serialize, Deserialize};
@@ -46,23 +46,43 @@ pub enum TaskContent {
     MultipleChoice(MultipleChoiceTask)
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct Tag {
     pub id: Uuid,
     pub name: String
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct Task<'a> {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Task {
     #[serde(with = "uuid::serde::simple")]
     pub id: Uuid,
-    pub title: &'a str, // We don't want the title to be mutable/growable, so we can store it in what is essentially a [u8]
+    pub title: String, // We don't want the title to be mutable/growable, so we can store it in what is essentially a [u8]
     pub content: TaskContent,
-    pub tags: Vec<Tag>
+    pub tags: HashSet<Tag>
+}
+
+impl PartialEq for Task {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id &&
+        self.title == other.title &&
+        self.content == other.content &&
+        self.tags == other.tags
+    }
 }
 
 impl Tag {
-    pub fn new(name: String) -> Tag {
+    pub async fn new(name: String, pool: &MySqlPool) -> Tag {
+        let existing_tag = query!("SELECT id FROM tags WHERE name = ?",
+            name
+        ).fetch_optional(pool).await.expect("Couldn't query db for existing tags");
+        
+        if let Some(tag) = existing_tag {
+            return Tag {
+                id: Uuid::parse_str(&tag.id).unwrap(),
+                name
+            }
+        }
+        
         Tag {
             id: uuid::Uuid::new_v4(),
             name
@@ -70,9 +90,13 @@ impl Tag {
     }
 }
 
-impl <'a> Task<'a> {
-    
+impl Task {
     async fn insert_task(&self, pool: &MySqlPool) -> Result<(), sqlx::Error> {
+        let existing_task = query!("SELECT id FROM tasks WHERE id = ?",
+            self.id.to_string()
+        ).fetch_optional(pool).await?;
+        
+        
         let content_json = serde_json::to_string(&self.content).expect("Couldn't serialize content");
         let mut transaction = pool.begin().await?;
         // Insert the task into the database
@@ -118,12 +142,62 @@ impl <'a> Task<'a> {
             .await?;
         }
         
-        transaction.rollback().await?;
+        transaction.commit().await?;
         
         Ok(())
     }
     
-    pub fn new(title : &'a str, content : TaskContent, tags: Vec<Tag>) -> Task<'a> {
+    async fn read_task(id: Uuid, pool: &MySqlPool) -> Result<Task, sqlx::Error> {
+        // Read the row from the tasks table
+        let task_row = query!(
+            "SELECT * FROM tasks WHERE id = ?",
+            id.to_string()
+        ).fetch_one(pool).await?;
+        
+        // Search for tags by tag_ids in the tags table
+        let tag_rows = query!(
+            "SELECT id, name FROM tags WHERE id IN (SELECT tag_id FROM task_tags WHERE task_id = ?)",
+            id.to_string()
+        ).fetch_all(pool).await?;
+        
+        dbg!(&tag_rows);
+        
+        let tags = tag_rows
+            .iter()
+            .map(|tag_row| Tag {
+                id: Uuid::parse_str(&tag_row.id).unwrap(),
+                name: tag_row.name.clone()
+            })
+            .collect();
+        
+        dbg!(&tags);
+        
+        
+        Ok(Task {
+            id: Uuid::parse_str(&task_row.id).unwrap(),
+            title: task_row.title,
+            content: serde_json::from_value(task_row.content).unwrap(),
+            tags
+        })
+    }
+    
+    async fn delete(id: Uuid, pool: &MySqlPool) -> Result<(), sqlx::Error> {
+        let mut transaction = pool.begin().await?;
+        
+        // Remove the task from the task_tags table
+        query!("DELETE FROM task_tags WHERE task_id = ?",
+            &id.to_string())
+        .execute(&mut *transaction).await?;
+        
+        // Remove the task from the tasks table
+        query!("DELETE FROM tasks WHERE id = ?",
+            &id.to_string())
+        .execute(&mut *transaction).await?;
+        
+        transaction.commit().await
+    }
+    
+    pub fn new(title : String, content : TaskContent, tags: HashSet<Tag>) -> Task {
         Task {
             id : uuid::Uuid::new_v4(),
             title,
@@ -336,11 +410,13 @@ impl Answer {
 mod tests {
     use super::*;
     use bcrypt::{hash, DEFAULT_COST};
+    use sqlx::MySqlConnection;
     use crate::database;
 
-    #[test]
-    fn test_task_serialization() {
-        let task = Task::new("Test task", TaskContent::Open(OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() }), vec![Tag::new("AI".to_string()), Tag::new("AGI".to_string())]);
+    #[tokio::test]
+    async fn test_task_serialization() {
+        let task = Task::new("Test task".to_string(), TaskContent::Open(OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() }),
+            HashSet::from([Tag{id: Uuid::new_v4(), name: "AI".to_string()}, Tag{id: Uuid::new_v4(), name: "Programming".to_string()}]));
         let serialized = task.serialize().unwrap();
         let deserialized = Task::deserialize(&serialized).unwrap();
         assert_eq!(task, deserialized);
@@ -385,10 +461,48 @@ mod tests {
         let binding = database::initialize_db_pool().await;
         let pool = binding.lock().await;
         let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
-        let tags = vec![Tag::new("AI".to_string()), Tag::new("AGI".to_string())];
-        let task = Task::new("Test task", TaskContent::Open(content), tags);
+        let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
+        let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
         
         let result = task.insert_task(&pool).await;
         assert!(result.is_ok());
+    }
+    
+    #[tokio::test]
+    async fn test_task_db_read() {
+        let binding = database::initialize_db_pool().await;
+        let pool = binding.lock().await;
+        let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
+        let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
+        let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
+        
+        assert!(task.insert_task(&pool).await.is_ok());
+        
+        let read_task = Task::read_task(task.id, &pool).await;      
+      
+        if let Err(e) = Task::delete(task.id, &pool).await {
+            dbg!("Couldn't cleanup after the opertaion");
+            dbg!(e);
+        }
+        
+        dbg!("{:#?}", &read_task);
+        
+        assert!(read_task.is_ok());
+        
+        assert_eq!(task, read_task.unwrap());  
+    }
+    
+    #[tokio::test]
+    async fn test_task_db_deletion() {
+        let binding = database::initialize_db_pool().await;
+        let pool = binding.lock().await;
+        let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
+        let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
+        let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
+        
+        task.insert_task(&pool).await;
+        
+        let result = Task::delete(task.id, &pool).await;
+        assert_eq!(result.is_ok(), true);
     }
 }
