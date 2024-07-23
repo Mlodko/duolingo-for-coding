@@ -32,12 +32,12 @@ mod serde_uuid_vec {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct OpenQuestionTask {
-    content: String
+    pub content: String
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct MultipleChoiceTask {
-    choices: Vec<String>
+    pub choices: Vec<String>
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -56,7 +56,7 @@ pub struct Tag {
 pub struct Task {
     #[serde(with = "uuid::serde::simple")]
     pub id: Uuid,
-    pub title: String, // We don't want the title to be mutable/growable, so we can store it in what is essentially a [u8]
+    pub title: String,
     pub content: TaskContent,
     pub tags: HashSet<Tag>
 }
@@ -91,7 +91,7 @@ impl Tag {
 }
 
 impl Task {
-    async fn insert_task(&self, pool: &MySqlPool) -> Result<(), sqlx::Error> {
+    pub async fn insert(&self, pool: &MySqlPool) -> Result<(), sqlx::Error> {
         let existing_task = query!("SELECT id FROM tasks WHERE id = ?",
             self.id.to_string()
         ).fetch_optional(pool).await?;
@@ -147,7 +147,7 @@ impl Task {
         Ok(())
     }
     
-    async fn read_task(id: Uuid, pool: &MySqlPool) -> Result<Task, sqlx::Error> {
+    pub async fn read(id: Uuid, pool: &MySqlPool) -> Result<Task, sqlx::Error> {
         // Read the row from the tasks table
         let task_row = query!(
             "SELECT * FROM tasks WHERE id = ?",
@@ -197,6 +197,84 @@ impl Task {
         transaction.commit().await
     }
     
+    async fn update(&self, pool: &MySqlPool) -> Result<(), sqlx::Error> {
+        let db_task = Task::read(self.id, pool).await?;
+        
+        if self == &db_task {
+            return Ok(());
+        }
+        
+        let mut transaction = pool.begin().await?;
+        
+        // Update task table
+        query!(
+            "UPDATE tasks SET title = ?, content = ? WHERE id = ?",
+            self.title,
+            serde_json::to_value(&self.content).unwrap(),
+            self.id.to_string()
+        ).execute(&mut *transaction).await?;
+        
+        // Check if tags have been added or removed
+        if &db_task.tags == &self.tags {
+            return Ok(());
+        }
+        
+        // Remove unneeded tags from task_tags
+        let tags_to_delete = &db_task.tags
+            .difference(&self.tags)
+            .collect::<Vec<&Tag>>();
+        
+        for tag in tags_to_delete {
+            query!(
+                "DELETE FROM task_tags WHERE task_id = ? AND tag_id = ?",
+                self.id.to_string(),
+                tag.id.to_string()
+            ).execute(&mut *transaction).await?;
+        }
+        
+        // Add new tags to task_tags and tags if needed
+        
+        let tasks_to_add = &self.tags
+            .difference(&db_task.tags)
+            .collect::<Vec<&Tag>>();
+        
+        for tag in tasks_to_add {
+            // Check if tag already exists
+            let tag_id = match sqlx::query!(
+                "SELECT id FROM tags WHERE name = ?",
+                tag.name
+            )
+            .fetch_optional(pool)
+            .await? {
+                Some(record) => Uuid::parse_str(&record.id).unwrap(),
+                None => {
+                    // Insert the tag into the database
+                    sqlx::query!(
+                        "INSERT INTO tags (id, name) VALUES (?, ?)",
+                        tag.id.to_string(),
+                        tag.name
+                    )
+                    .execute(&mut *transaction)
+                    .await?;
+                    tag.id
+                }
+            };
+            
+            // Insert the task-tag relation into the database
+            sqlx::query!(
+                "INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)",
+                self.id.to_string(),
+                tag_id.to_string()
+            )
+            .execute(&mut *transaction)
+            .await?;
+        }
+        
+        transaction.commit().await?;
+        
+        Ok(())
+    }
+    
     pub fn new(title : String, content : TaskContent, tags: HashSet<Tag>) -> Task {
         Task {
             id : uuid::Uuid::new_v4(),
@@ -221,7 +299,7 @@ pub struct UserProgress {
     unit: u32,      // Beginner/intermediate/UI/A&DS
     sector: u32,    // Syntax/loops/objects/inheritance
     level: u32,     // Loops -> for/while/do while
-    task: u32     // 5-10 tasks
+    task: u32       // 5-10 tasks
 }
 
 impl UserProgress {
@@ -464,7 +542,7 @@ mod tests {
         let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
         let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
         
-        let result = task.insert_task(&pool).await;
+        let result = task.insert(&pool).await;
         assert!(result.is_ok());
     }
     
@@ -476,9 +554,9 @@ mod tests {
         let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
         let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
         
-        assert!(task.insert_task(&pool).await.is_ok());
+        assert!(task.insert(&pool).await.is_ok());
         
-        let read_task = Task::read_task(task.id, &pool).await;      
+        let read_task = Task::read(task.id, &pool).await;      
       
         if let Err(e) = Task::delete(task.id, &pool).await {
             dbg!("Couldn't cleanup after the opertaion");
@@ -491,6 +569,7 @@ mod tests {
         
         assert_eq!(task, read_task.unwrap());  
     }
+
     
     #[tokio::test]
     async fn test_task_db_deletion() {
@@ -500,7 +579,7 @@ mod tests {
         let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
         let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
         
-        task.insert_task(&pool).await;
+        task.insert(&pool).await;
         
         let result = Task::delete(task.id, &pool).await;
         assert_eq!(result.is_ok(), true);
