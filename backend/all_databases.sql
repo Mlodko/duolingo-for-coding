@@ -353,7 +353,7 @@ UNLOCK TABLES;
 --
 
 /*!40000 ALTER TABLE `innodb_index_stats` DISABLE KEYS */;
-INSERT  IGNORE INTO `innodb_index_stats` VALUES ('duolingodb','tags','PRIMARY','2024-07-18 18:04:00','n_diff_pfx01',2,1,'id'),('duolingodb','tags','PRIMARY','2024-07-18 18:04:00','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','tags','PRIMARY','2024-07-18 18:04:00','size',1,NULL,'Number of pages in the index'),('duolingodb','tags','name','2024-07-18 18:04:00','n_diff_pfx01',2,1,'name'),('duolingodb','tags','name','2024-07-18 18:04:00','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','tags','name','2024-07-18 18:04:00','size',1,NULL,'Number of pages in the index'),('duolingodb','task_tags','PRIMARY','2024-07-18 18:04:10','n_diff_pfx01',0,1,'task_id'),('duolingodb','task_tags','PRIMARY','2024-07-18 18:04:10','n_diff_pfx02',0,1,'task_id,tag_id'),('duolingodb','task_tags','PRIMARY','2024-07-18 18:04:10','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','task_tags','PRIMARY','2024-07-18 18:04:10','size',1,NULL,'Number of pages in the index'),('duolingodb','task_tags','tag_id','2024-07-18 18:04:10','n_diff_pfx01',0,1,'tag_id'),('duolingodb','task_tags','tag_id','2024-07-18 18:04:10','n_diff_pfx02',0,1,'tag_id,task_id'),('duolingodb','task_tags','tag_id','2024-07-18 18:04:10','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','task_tags','tag_id','2024-07-18 18:04:10','size',1,NULL,'Number of pages in the index'),('duolingodb','tasks','PRIMARY','2024-07-18 18:04:00','n_diff_pfx01',1,1,'id'),('duolingodb','tasks','PRIMARY','2024-07-18 18:04:00','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','tasks','PRIMARY','2024-07-18 18:04:00','size',1,NULL,'Number of pages in the index'),('mysql','component','PRIMARY','2024-07-18 16:50:03','n_diff_pfx01',0,1,'component_id'),('mysql','component','PRIMARY','2024-07-18 16:50:03','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mysql','component','PRIMARY','2024-07-18 16:50:03','size',1,NULL,'Number of pages in the index'),('sys','sys_config','PRIMARY','2024-07-17 17:56:52','n_diff_pfx01',5,1,'variable'),('sys','sys_config','PRIMARY','2024-07-17 17:56:52','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('sys','sys_config','PRIMARY','2024-07-17 17:56:52','size',1,NULL,'Number of pages in the index');
+INSERT  IGNORE INTO `innodb_index_stats` VALUES ('duolingodb','friends','PRIMARY','2024-07-27 17:27:02','n_diff_pfx01',0,1,'user_id_1'),('duolingodb','friends','PRIMARY','2024-07-27 17:27:02','n_diff_pfx02',0,1,'user_id_1,user_id_2'),('duolingodb','friends','PRIMARY','2024-07-27 17:27:02','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','friends','PRIMARY','2024-07-27 17:27:02','size',1,NULL,'Number of pages in the index'),('duolingodb','friends','user_id_2','2024-07-27 17:27:02','n_diff_pfx01',0,1,'user_id_2'),('duolingodb','friends','user_id_2','2024-07-27 17:27:02','n_diff_pfx02',0,1,'user_id_2,user_id_1'),('duolingodb','friends','user_id_2','2024-07-27 17:27:02','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','friends','user_id_2','2024-07-27 17:27:02','size',1,NULL,'Number of pages in the index'),('duolingodb','sessions','PRIMARY','2024-07-27 17:31:08','n_diff_pfx01',0,1,'user_id'),('duolingodb','sessions','PRIMARY','2024-07-27 17:31:08','n_diff_pfx02',0,1,'user_id,auth_token'),('duolingodb','sessions','PRIMARY','2024-07-27 17:31:08','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','sessions','PRIMARY','2024-07-27 17:31:08','size',1,NULL,'Number of pages in the index'),('duolingodb','tags','PRIMARY','2024-07-27 17:10:01','n_diff_pfx01',0,1,'id'),('duolingodb','tags','PRIMARY','2024-07-27 17:10:01','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','tags','PRIMARY','2024-07-27 17:10:01','size',1,NULL,'Number of pages in the index'),('duolingodb','tags','name','2024-07-27 17:10:01','n_diff_pfx01',0,1,'name'),('duolingodb','tags','name','2024-07-27 17:10:01','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','tags','name','2024-07-27 17:10:01','size',1,NULL,'Number of pages in the index'),('duolingodb','task_tags','PRIMARY','2024-07-27 17:10:01','n_diff_pfx01',0,1,'task_id'),('duolingodb','task_tags','PRIMARY','2024-07-27 17:10:01','n_diff_pfx02',0,1,'task_id,tag_id'),('duolingodb','task_tags','PRIMARY','2024-07-27 17:10:01','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','task_tags','PRIMARY','2024-07-27 17:10:01','size',1,NULL,'Number of pages in the index'),('duolingodb','task_tags','tag_id','2024-07-27 17:10:01','n_diff_pfx01',0,1,'tag_id'),('duolingodb','task_tags','tag_id','2024-07-27 17:10:01','n_diff_pfx02',0,1,'tag_id,task_id'),('duolingodb','task_tags','tag_id','2024-07-27 17:10:01','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','task_tags','tag_id','2024-07-27 17:10:01','size',1,NULL,'Number of pages in the index'),('duolingodb','tasks','PRIMARY','2024-07-27 17:10:01','n_diff_pfx01',0,1,'id'),('duolingodb','tasks','PRIMARY','2024-07-27 17:10:01','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','tasks','PRIMARY','2024-07-27 17:10:01','size',1,NULL,'Number of pages in the index'),('duolingodb','users','PRIMARY','2024-07-27 17:21:49','n_diff_pfx01',0,1,'id'),('duolingodb','users','PRIMARY','2024-07-27 17:21:49','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('duolingodb','users','PRIMARY','2024-07-27 17:21:49','size',1,NULL,'Number of pages in the index'),('mysql','component','PRIMARY','2024-07-27 17:09:58','n_diff_pfx01',0,1,'component_id'),('mysql','component','PRIMARY','2024-07-27 17:09:58','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('mysql','component','PRIMARY','2024-07-27 17:09:58','size',1,NULL,'Number of pages in the index'),('sys','sys_config','PRIMARY','2024-07-17 17:56:52','n_diff_pfx01',5,1,'variable'),('sys','sys_config','PRIMARY','2024-07-17 17:56:52','n_leaf_pages',1,NULL,'Number of leaf pages in the index'),('sys','sys_config','PRIMARY','2024-07-17 17:56:52','size',1,NULL,'Number of pages in the index');
 /*!40000 ALTER TABLE `innodb_index_stats` ENABLE KEYS */;
 
 --
@@ -361,7 +361,7 @@ INSERT  IGNORE INTO `innodb_index_stats` VALUES ('duolingodb','tags','PRIMARY','
 --
 
 /*!40000 ALTER TABLE `innodb_table_stats` DISABLE KEYS */;
-INSERT  IGNORE INTO `innodb_table_stats` VALUES ('duolingodb','tags','2024-07-18 18:04:00',2,1,1),('duolingodb','task_tags','2024-07-18 18:04:10',0,1,1),('duolingodb','tasks','2024-07-18 18:04:00',1,1,0),('mysql','component','2024-07-18 16:50:03',0,1,0),('sys','sys_config','2024-07-17 17:56:52',5,1,0);
+INSERT  IGNORE INTO `innodb_table_stats` VALUES ('duolingodb','friends','2024-07-27 17:27:02',0,1,1),('duolingodb','sessions','2024-07-27 17:31:08',0,1,0),('duolingodb','tags','2024-07-27 17:10:01',0,1,1),('duolingodb','task_tags','2024-07-27 17:10:01',0,1,1),('duolingodb','tasks','2024-07-27 17:10:01',0,1,0),('duolingodb','users','2024-07-27 17:21:49',0,1,0),('mysql','component','2024-07-27 17:09:58',0,1,0),('sys','sys_config','2024-07-17 17:56:52',5,1,0);
 /*!40000 ALTER TABLE `innodb_table_stats` ENABLE KEYS */;
 
 --
@@ -1036,6 +1036,58 @@ CREATE DATABASE /*!32312 IF NOT EXISTS*/ `duolingodb` /*!40100 DEFAULT CHARACTER
 USE `duolingodb`;
 
 --
+-- Table structure for table `friends`
+--
+
+DROP TABLE IF EXISTS `friends`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `friends` (
+  `user_id_1` char(36) NOT NULL,
+  `user_id_2` char(36) NOT NULL,
+  PRIMARY KEY (`user_id_1`,`user_id_2`),
+  KEY `user_id_2` (`user_id_2`),
+  CONSTRAINT `friends_ibfk_1` FOREIGN KEY (`user_id_1`) REFERENCES `users` (`id`),
+  CONSTRAINT `friends_ibfk_2` FOREIGN KEY (`user_id_2`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `friends`
+--
+
+LOCK TABLES `friends` WRITE;
+/*!40000 ALTER TABLE `friends` DISABLE KEYS */;
+/*!40000 ALTER TABLE `friends` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `sessions`
+--
+
+DROP TABLE IF EXISTS `sessions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `sessions` (
+  `user_id` char(36) NOT NULL,
+  `auth_token` char(36) NOT NULL,
+  `expiration_time` datetime NOT NULL,
+  `creation_time` datetime NOT NULL,
+  PRIMARY KEY (`user_id`,`auth_token`),
+  CONSTRAINT `sessions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `sessions`
+--
+
+LOCK TABLES `sessions` WRITE;
+/*!40000 ALTER TABLE `sessions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `sessions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `tags`
 --
 
@@ -1108,6 +1160,35 @@ LOCK TABLES `tasks` WRITE;
 /*!40000 ALTER TABLE `tasks` DISABLE KEYS */;
 /*!40000 ALTER TABLE `tasks` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Table structure for table `users`
+--
+
+DROP TABLE IF EXISTS `users`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `users` (
+  `id` char(36) NOT NULL,
+  `password_hash` varchar(128) NOT NULL,
+  `username` varchar(64) NOT NULL,
+  `email` varchar(128) DEFAULT NULL,
+  `phone` varchar(32) DEFAULT NULL,
+  `bio` varchar(256) DEFAULT NULL,
+  `level` int NOT NULL,
+  `xp` int NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `users`
+--
+
+LOCK TABLES `users` WRITE;
+/*!40000 ALTER TABLE `users` DISABLE KEYS */;
+/*!40000 ALTER TABLE `users` ENABLE KEYS */;
+UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!50606 SET GLOBAL INNODB_STATS_AUTO_RECALC=@OLD_INNODB_STATS_AUTO_RECALC */;
 
@@ -1119,4 +1200,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-07-18 20:05:43
+-- Dump completed on 2024-07-27 19:31:53
