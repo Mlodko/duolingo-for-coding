@@ -3,7 +3,6 @@ use sqlx::MySqlPool;
 use uuid::Uuid;
 use sqlx::query;
 use std::collections::HashSet;
-use chrono::{prelude::*, TimeDelta};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct OpenQuestionTask {
@@ -80,11 +79,13 @@ impl Tag {
 
 
 pub mod database {
+    use sqlx::{MySql, Transaction};
+
     use super::*;
     impl Task {
-        pub async fn insert(&self, pool: &MySqlPool) -> Result<(), sqlx::Error> {
+        pub async fn create(&self, transaction :&mut Transaction<'static, MySql>) -> Result<(), sqlx::Error> {
             let content_json = serde_json::to_string(&self.content).expect("Couldn't serialize content");
-            let mut transaction = pool.begin().await?;
+            
             // Insert the task into the database
             sqlx::query!(
                 r#"INSERT INTO tasks (id, title, content) VALUES (?, ?, ?)"#,
@@ -92,7 +93,7 @@ pub mod database {
                 self.title,
                 content_json
             )
-            .execute(&mut *transaction)
+            .execute(transaction.as_mut())
             .await?;
             
             // Insert the tags into the database
@@ -102,7 +103,7 @@ pub mod database {
                     "SELECT id FROM tags WHERE name = ?",
                     tag.name
                 )
-                .fetch_optional(pool)
+                .fetch_optional(transaction.as_mut())
                 .await? {
                     Some(record) => Uuid::parse_str(&record.id).unwrap(),
                     None => {
@@ -112,7 +113,7 @@ pub mod database {
                             tag.id.to_string(),
                             tag.name
                         )
-                        .execute(&mut *transaction)
+                        .execute(transaction.as_mut())
                         .await?;
                         tag.id
                     }
@@ -124,27 +125,25 @@ pub mod database {
                     self.id.to_string(),
                     tag_id.to_string()
                 )
-                .execute(&mut *transaction)
+                .execute(transaction.as_mut())
                 .await?;
             }
-            
-            transaction.commit().await?;
             
             Ok(())
         }
         
-        pub async fn read(id: Uuid, pool: &MySqlPool) -> Result<Task, sqlx::Error> {
+        pub async fn read(id: Uuid, transaction :&mut Transaction<'static, MySql>) -> Result<Task, sqlx::Error> {
             // Read the row from the tasks table
             let task_row = query!(
                 "SELECT * FROM tasks WHERE id = ?",
                 id.to_string()
-            ).fetch_one(pool).await?;
+            ).fetch_one(transaction.as_mut()).await?;
             
             // Search for tags by tag_ids in the tags table
             let tag_rows = query!(
                 "SELECT id, name FROM tags WHERE id IN (SELECT tag_id FROM task_tags WHERE task_id = ?)",
                 id.to_string()
-            ).fetch_all(pool).await?;
+            ).fetch_all(transaction.as_mut()).await?;
             
             dbg!(&tag_rows);
             
@@ -167,30 +166,12 @@ pub mod database {
             })
         }
         
-        pub async fn delete(id: Uuid, pool: &MySqlPool) -> Result<(), sqlx::Error> {
-            let mut transaction = pool.begin().await?;
-            
-            // Remove the task from the task_tags table
-            query!("DELETE FROM task_tags WHERE task_id = ?",
-                &id.to_string())
-            .execute(&mut *transaction).await?;
-            
-            // Remove the task from the tasks table
-            query!("DELETE FROM tasks WHERE id = ?",
-                &id.to_string())
-            .execute(&mut *transaction).await?;
-            
-            transaction.commit().await
-        }
-        
-        async fn update(&self, pool: &MySqlPool) -> Result<(), sqlx::Error> {
-            let db_task = Task::read(self.id, pool).await?;
+        async fn update(&self, transaction: &mut Transaction<'static, MySql>) -> Result<(), sqlx::Error> {
+            let db_task = Task::read(self.id, transaction).await?;
             
             if self == &db_task {
                 return Ok(());
             }
-            
-            let mut transaction = pool.begin().await?;
             
             // Update task table
             query!(
@@ -198,7 +179,7 @@ pub mod database {
                 self.title,
                 serde_json::to_value(&self.content).unwrap(),
                 self.id.to_string()
-            ).execute(&mut *transaction).await?;
+            ).execute(transaction.as_mut()).await?;
             
             // Check if tags have been added or removed
             if db_task.tags == self.tags {
@@ -215,7 +196,7 @@ pub mod database {
                     "DELETE FROM task_tags WHERE task_id = ? AND tag_id = ?",
                     self.id.to_string(),
                     tag.id.to_string()
-                ).execute(&mut *transaction).await?;
+                ).execute(transaction.as_mut()).await?;
             }
             
             // Add new tags to task_tags and tags if needed
@@ -230,7 +211,7 @@ pub mod database {
                     "SELECT id FROM tags WHERE name = ?",
                     tag.name
                 )
-                .fetch_optional(pool)
+                .fetch_optional(transaction.as_mut())
                 .await? {
                     Some(record) => Uuid::parse_str(&record.id).unwrap(),
                     None => {
@@ -240,7 +221,7 @@ pub mod database {
                             tag.id.to_string(),
                             tag.name
                         )
-                        .execute(&mut *transaction)
+                        .execute(transaction.as_mut())
                         .await?;
                         tag.id
                     }
@@ -252,13 +233,117 @@ pub mod database {
                     self.id.to_string(),
                     tag_id.to_string()
                 )
-                .execute(&mut *transaction)
+                .execute(transaction.as_mut())
                 .await?;
             }
+            Ok(())
+        }
+        
+        pub async fn delete(id: Uuid, transaction :&mut Transaction<'static, MySql>) -> Result<(), sqlx::Error> {            
+            // Remove the task from the task_tags table
+            query!("DELETE FROM task_tags WHERE task_id = ?",
+                &id.to_string())
+            .execute(transaction.as_mut()).await?;
             
-            transaction.commit().await?;
+            // Remove the task from the tasks table
+            query!("DELETE FROM tasks WHERE id = ?",
+                &id.to_string())
+            .execute(transaction.as_mut()).await?;
             
             Ok(())
+        }
+    }
+    
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::database;
+        
+        #[tokio::test]
+        async fn test_create() {
+            let binding = database::get_database_connection_pool().await.unwrap();
+            let pool = binding.lock().await;
+            let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
+            let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
+            let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
+            
+            let mut tx = pool.begin().await.unwrap();
+            let result = task.create(&mut tx).await;
+            assert!(result.is_ok());
+            let _ = tx.rollback().await;
+        }
+        
+        #[tokio::test]
+        async fn test_read() {
+            let binding = database::get_database_connection_pool().await.unwrap();
+            let pool = binding.lock().await;
+            let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
+            let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
+            let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
+            
+            let mut tx = pool.begin().await.unwrap();
+            
+            let create_result = task.create(&mut tx).await;
+            
+            dbg!("{:#?}", &create_result);
+            
+            assert!(create_result.is_ok());
+            
+            let read_task = Task::read(task.id, &mut tx).await;      
+          
+            if let Err(e) = Task::delete(task.id, &mut tx).await {
+                dbg!("Couldn't cleanup after the opertaion");
+                dbg!(e);
+            }
+            
+            dbg!(&read_task);
+            
+            assert!(read_task.is_ok());
+            
+            assert_eq!(task, read_task.unwrap());
+          
+            let _ = tx.rollback().await;
+        }
+    
+        #[tokio::test]
+        async fn test_update() {
+            let binding = database::get_database_connection_pool().await.unwrap();
+            let pool = binding.lock().await;
+            let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
+            let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
+            let mut task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
+            
+            let mut tx = pool.begin().await.unwrap();
+            
+            let _ = task.create(&mut tx).await;
+            
+            let new_content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google. You can use Bing".to_string() };
+            task.tags.extend([Tag::new("New Tag".to_string(), &pool).await]);
+            task.content = TaskContent::Open(new_content);
+            
+            let result = task.update(&mut tx).await;
+            assert_eq!(result.is_ok(), true);
+            
+            let read_updated_task = Task::read(task.id, &mut tx).await.unwrap();
+            assert_eq!(task, read_updated_task);
+        }
+        
+        #[tokio::test]
+        async fn test_delete() {
+            let binding = database::get_database_connection_pool().await.unwrap();
+            let pool = binding.lock().await;
+            let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
+            let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
+            let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
+            
+            let mut tx = pool.begin().await.unwrap();
+            
+            let _ = task.create(&mut tx).await;
+            
+            let result = Task::delete(task.id, &mut tx).await;
+            assert_eq!(result.is_ok(), true);
+            
+            let _ = tx.rollback().await;
         }
     }
 }
@@ -281,56 +366,7 @@ mod tests {
     use super::*;
     use crate::database;
     
-    #[tokio::test]
-    async fn test_task_db_insertion() {
-        let binding = database::get_database_connection_pool().await.unwrap();
-        let pool = binding.lock().await;
-        let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
-        let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
-        let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
-        
-        let result = task.insert(&pool).await;
-        assert!(result.is_ok());
-    }
     
-    #[tokio::test]
-    async fn test_task_db_read() {
-        let binding = database::get_database_connection_pool().await.unwrap();
-        let pool = binding.lock().await;
-        let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
-        let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
-        let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
-        
-        assert!(task.insert(&pool).await.is_ok());
-        
-        let read_task = Task::read(task.id, &pool).await;      
-      
-        if let Err(e) = Task::delete(task.id, &pool).await {
-            dbg!("Couldn't cleanup after the opertaion");
-            dbg!(e);
-        }
-        
-        dbg!("{:#?}", &read_task);
-        
-        assert!(read_task.is_ok());
-        
-        assert_eq!(task, read_task.unwrap());  
-    }
-
-    
-    #[tokio::test]
-    async fn test_task_db_deletion() {
-        let binding = database::get_database_connection_pool().await.unwrap();
-        let pool = binding.lock().await;
-        let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
-        let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
-        let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
-        
-        task.insert(&pool).await;
-        
-        let result = Task::delete(task.id, &pool).await;
-        assert_eq!(result.is_ok(), true);
-    }
     
     #[tokio::test]
     async fn test_task_serialization() {

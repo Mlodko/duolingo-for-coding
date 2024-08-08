@@ -1,12 +1,12 @@
-use crate::{
-    database,
-    models::{task::*, user::*},
-};
+use crate::models::user::*;
+use crate::models::task::*;
 use axum::{
     extract::{Path, State},
     http::{header, HeaderMap, StatusCode},
     response::IntoResponse,
     routing::get,
+    routing::post,
+    routing::put,
     Json, Router,
 };
 use sqlx::MySqlPool;
@@ -22,17 +22,19 @@ struct AppState {
     db_pool: Arc<Mutex<MySqlPool>>,
 }
 
-
-
 pub async fn start(db_pool: Arc<Mutex<MySqlPool>>) -> Result<(), std::io::Error> {
     let app = Router::new()
         .route("/test", get(test))
-        .route(
-            "/user",
-            get(user::login).post(user::register).put(user::update),
-        )
+        
+        .route("/user", put(user::put))
+        .route("/user/login", get(user::login))
+        .route("/user/register", post(user::register))
+        .route("/user/:id", get(user::get).delete(user::delete))
+        
         .route("/task/:id", get(task::get))
-        .route("/answer", get(answer::get_answer).post(answer::post_answer))
+        
+        .route("/answer", post(answer::post).put(answer::put).delete(answer::delete))
+        .route("/answer/:id", get(answer::get))
         .with_state(AppState { db_pool });
     let listener = tokio::net::TcpListener::bind(format!("{}:{}", IP_ADDRESS, PORT))
         .await?;
@@ -55,8 +57,14 @@ async fn authorize(headers: HeaderMap, state: &AppState) -> Result<(), impl Into
     };
 
     let db_pool = state.db_pool.lock().await;
+    let mut tx = match db_pool.begin().await {
+        Ok(tx) => tx,
+        Err(_) => {
+            return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
+        }
+    };
 
-    let auth_result = User::check_authorization(&Some(token), &db_pool).await;
+    let auth_result = User::check_authorization(&Some(token), &mut tx).await;
 
     match auth_result {
         Ok(result) => {
@@ -78,7 +86,8 @@ async fn authorize(headers: HeaderMap, state: &AppState) -> Result<(), impl Into
             return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
         }
     };
-
+    
+    tx.commit().await.unwrap();
     Ok(())
 }
 
@@ -97,9 +106,17 @@ mod user {
     
     pub async fn login(State(state): State<AppState>, Json(form): Json<LoginForm>) -> impl IntoResponse {
         let db_pool = state.db_pool.lock().await;
+        let mut tx = match db_pool.begin().await {
+            Ok(tx) => tx,
+            Err(_) => {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
         
-        match User::login(form.username, form.password_hash, &db_pool).await {
+        match User::login(form.username, form.password_hash, &mut tx).await {
             Ok(user) => {
+                tx.commit().await.unwrap();
+                
                 axum::http::Response::builder()
                     .status(StatusCode::OK)
                     .header(header::AUTHORIZATION, user.auth_token.unwrap().to_string())
@@ -127,18 +144,19 @@ mod user {
         Json(form): Json<RegisterForm>,
     ) -> impl IntoResponse {
         let db_pool = state.db_pool.lock().await;
-    
-        match User::new(
-            form.username,
-            form.password_hash,
-            form.email,
-            form.phone,
-            &db_pool).await {
-                
+        let mut tx = match db_pool.begin().await {
+            Ok(tx) => tx,
+            Err(_) => {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+        
+        match User::new(form.username, form.password_hash, form.email, form.phone, &mut tx).await {
             Ok(user) => {
-                if (user.insert(&db_pool).await).is_err() {
+                if (user.create(&mut tx).await).is_err() {
                     return StatusCode::INTERNAL_SERVER_ERROR.into_response();
                 }
+                tx.commit().await.unwrap();
                 StatusCode::CREATED.into_response()
             }
             Err(e) => match e {
@@ -151,7 +169,7 @@ mod user {
         }
     }
     
-    pub async fn update(
+    pub async fn put(
         headers: HeaderMap,
         State(state): State<AppState>,
         Json(user): Json<User>,
@@ -161,9 +179,112 @@ mod user {
         }
     
         let db_pool = state.db_pool.lock().await;
+        let mut tx = match db_pool.begin().await {
+            Ok(tx) => tx,
+            Err(_) => {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
     
-        match user.update(&db_pool).await {
-            Ok(_) => StatusCode::OK.into_response(),
+        match user.update(&mut tx).await {
+            Ok(_) => {
+                tx.commit().await.unwrap();
+                StatusCode::OK.into_response()
+            },
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    }
+    
+    #[derive(serde::Serialize ,serde::Deserialize, Debug)]
+    pub struct UserInfo {
+        pub username: String,
+        pub email: Option<String>,
+        pub phone: Option<String>,
+        pub bio: Option<String>,
+        pub friends: Vec<Uuid>,
+        pub level: UserLevel,
+        pub progress: UserProgress
+    }
+    
+    impl UserInfo {
+        pub fn from_user(user: User) -> Self {
+            Self {
+                username: user.username,
+                email: user.email,
+                phone: user.phone,
+                bio: user.bio,
+                friends: user.friends,
+                level: user.level,
+                progress: user.progress,
+            }
+        }
+    }
+    
+    pub async fn get(
+        headers: HeaderMap,
+        State(state): State<AppState>,
+        Path(id_str): Path<String>,
+    ) -> impl IntoResponse {
+        if let Err(err_response) = authorize(headers, &state).await {
+            return err_response.into_response();
+        }
+    
+        let id = match Uuid::parse_str(&id_str) {
+            Ok(id) => id,
+            Err(_) => {
+                return StatusCode::BAD_REQUEST.into_response();
+            }
+        };
+    
+        let db_pool = state.db_pool.lock().await;
+        let mut tx = match db_pool.begin().await {
+            Ok(tx) => tx,
+            Err(_) => {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+    
+        match User::read(id, &mut tx).await {
+            Ok(user) => {
+                tx.commit().await.unwrap();
+                axum::http::Response::builder()
+                    .status(StatusCode::OK)
+                    .body(serde_json::to_string(&UserInfo::from_user(user)).unwrap().into())
+                    .unwrap()
+            }
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    }
+    
+    pub async fn delete(
+        headers: HeaderMap,
+        State(state): State<AppState>,
+        Path(id_str) : Path<String>,
+    ) -> impl IntoResponse {
+        if let Err(err_response) = authorize(headers, &state).await {
+            return err_response.into_response();
+        }
+    
+        let id = match Uuid::parse_str(&id_str) {
+            Ok(id) => id,
+            Err(_) => {
+                return StatusCode::BAD_REQUEST.into_response();
+            }
+        };
+    
+        let db_pool = state.db_pool.lock().await;
+        let mut tx = match db_pool.begin().await {
+            Ok(tx) => tx,
+            Err(_) => {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+    
+        match User::delete(id, &mut tx).await {
+            Ok(_) => {
+                tx.commit().await.unwrap();
+                StatusCode::OK.into_response()
+            },
             Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
     }
@@ -173,22 +294,32 @@ mod task {
     use super::*;
    
     pub async fn get(Path(id_str): Path<String>, State(state): State<AppState>) -> impl IntoResponse {
-        let id = Uuid::parse_str(&id_str);
-        println!("Got Task get by id request: {:?}", &id);
+        let id = match Uuid::parse_str(&id_str) {
+            Ok(id) => id,
+            Err(_) => {
+                return StatusCode::BAD_REQUEST.into_response();
+            }
+        };
     
-        if id.is_err() {
-            return StatusCode::BAD_REQUEST.into_response();
-        }
-    
-        let id = id.unwrap();
         let db_pool = state.db_pool.lock().await;
-        let task = Task::read(id, &db_pool).await;
+        let mut tx = match db_pool.begin().await {
+            Ok(tx) => tx,
+            Err(_) => {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+
+        
+        let task = Task::read(id, &mut tx).await;
         match task {
-            Ok(task) => Json(task).into_response(),
-    
+            Ok(task) => {
+                tx.commit().await.unwrap();
+                Json(task).into_response()
+            },
+            
             Err(e) => match e {
                 sqlx::Error::RowNotFound => StatusCode::NOT_FOUND.into_response(),
-    
+                
                 _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
             },
         }
@@ -196,39 +327,152 @@ mod task {
 }
 
 mod answer {
+    use axum::http::Response;
     use super::*;
+    use crate::models::answer::*;
     
-    pub async fn get_answer() -> impl IntoResponse {
-        todo!("Getting answers not yet implemented");
+    pub async fn get(
+        Path(id_str) : Path<String>, 
+        State(state): State<AppState>,
+        headers: HeaderMap,
+    ) -> impl IntoResponse {
+        
+        if let Err(err_response) = authorize(headers, &state).await {
+            return err_response.into_response();
+        }
+        
+        let id = match Uuid::parse_str(&id_str) {
+            Ok(id) => id,
+            Err(_) => {
+                return StatusCode::BAD_REQUEST.into_response();
+            }
+        };
+        
+        let db_pool = state.db_pool.lock().await;
+        let mut tx = match db_pool.begin().await {
+            Ok(tx) => tx,
+            Err(_) => {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+        
+        match Answer::read(id, &mut tx).await {
+            Ok(answer) => {
+                tx.commit().await.unwrap();
+                match answer {
+                    Some(answer) => {
+                        Response::builder()
+                            .status(StatusCode::OK)
+                            .body(answer.serialize().unwrap().into())
+                            .unwrap()
+                    },
+                    None => StatusCode::NOT_FOUND.into_response(),
+                }
+            },
+            Err(e) => match e {
+                sqlx::Error::RowNotFound => StatusCode::NOT_FOUND.into_response(),
+                _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            },
+        }
     }
     
-    pub async fn post_answer() -> impl IntoResponse {
-        todo!("Posting answers not yet implemented");
+    pub async fn post(
+        headers: HeaderMap,
+        State(state): State<AppState>,
+        Json(answer): Json<Answer>,
+    ) -> impl IntoResponse {
+        if let Err(err_response) = authorize(headers, &state).await {
+            return err_response.into_response();
+        }
+        
+        let db_pool = state.db_pool.lock().await;
+        let mut tx = match db_pool.begin().await {
+            Ok(tx) => tx,
+            Err(_) => {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+       
+        match answer.create(&mut tx).await {
+            Ok(_) => StatusCode::CREATED.into_response(),
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        } 
+    }
+    
+    pub async fn put(
+        headers: HeaderMap,
+        State(state): State<AppState>,
+        Json(answer): Json<Answer>,
+    ) -> impl IntoResponse {
+        if let Err(err_response) = authorize(headers, &state).await {
+            return err_response.into_response();
+        }
+        
+        let db_pool = state.db_pool.lock().await;
+        let mut tx = match db_pool.begin().await {
+            Ok(tx) => tx,
+            Err(_) => {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+        
+        match answer.update(&mut tx).await {
+            Ok(_) => StatusCode::OK.into_response(),
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    }
+    
+    pub async fn delete(
+        headers: HeaderMap,
+        State(state): State<AppState>,
+        Path(id_str): Path<String>,
+    ) -> impl IntoResponse {
+        if let Err(err_response) = authorize(headers, &state).await {
+            return err_response.into_response();
+        }
+        
+        let id = match Uuid::parse_str(&id_str) {
+            Ok(id) => id,
+            Err(_) => {
+                return StatusCode::BAD_REQUEST.into_response();
+            }
+        };
+        
+        let db_pool = state.db_pool.lock().await;
+        let mut tx = match db_pool.begin().await {
+            Ok(tx) => tx,
+            Err(_) => {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+        
+        match Answer::delete(id, &mut tx).await {
+            Ok(_) => StatusCode::NO_CONTENT.into_response(),
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::database;
     use reqwest::StatusCode;
-    use tokio::runtime::Runtime;
 
     #[tokio::test]
     async fn test_endpoint() {
-        let rt = Runtime::new().unwrap();
         let db_pool = database::get_database_connection_pool().await.unwrap();
-        rt.block_on(async {
-            // Start the server in a separate Tokio task
-            tokio::spawn(start(db_pool));
 
-            // Give the server a moment to start
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        // Start the server in a separate Tokio task
+        tokio::spawn(start(db_pool));
 
-            let response = reqwest::get(format!("http://{}:{}/test", IP_ADDRESS, PORT))
-                .await
-                .expect("Failed to execute request.");
+        // Give the server a moment to start
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-            assert_eq!(response.status(), StatusCode::OK);
-        });
+        let response = reqwest::get(format!("http://{}:{}/test", IP_ADDRESS, PORT))
+            .await
+            .expect("Failed to execute request.");
+
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }
