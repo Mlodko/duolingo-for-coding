@@ -264,7 +264,9 @@ mod user {
         if let Err(err_response) = authorize(headers, &state).await {
             return err_response.into_response();
         }
-    
+        
+        // TODO check if user id is the same as the one in the token
+        
         let id = match Uuid::parse_str(&id_str) {
             Ok(id) => id,
             Err(_) => {
