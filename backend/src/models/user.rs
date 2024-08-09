@@ -72,7 +72,8 @@ pub enum UserError {
 pub enum AuthorizationError {
     NoTokenInUser,
     TokenNotInDatabse,
-    TokenExpired
+    TokenExpired,
+    NotAuthorized
 }
 
 impl User {
@@ -319,7 +320,7 @@ pub mod database {
             Ok(user)
         }
 
-        pub async fn check_authorization(auth_token: &Option<Uuid>, transaction: &mut Transaction<'static, MySql>)
+        pub async fn check_token_validity(auth_token: &Option<Uuid>, transaction: &mut Transaction<'static, MySql>)
          -> Result<Result<(), AuthorizationError>, sqlx::Error> {
             use AuthorizationError::*;
             /*
@@ -340,6 +341,24 @@ pub mod database {
                                 Ok(Ok(()))
                             }
                         }
+                    }
+                }
+            }
+        }
+        
+        pub async fn check_authorization(auth_token: Uuid, user_id: &Uuid, transaction: &mut Transaction<'static, MySql>) -> Result<Result<(), AuthorizationError>, sqlx::Error> {
+            use AuthorizationError::*;
+            
+            let record = query!("SELECT user_id FROM sessions WHERE auth_token = ?", auth_token.to_string())
+                .fetch_optional(transaction.as_mut()).await?;
+            
+            match record {
+                None => Ok(Err(TokenNotInDatabse)),
+                Some(record) => {
+                    if record.user_id == user_id.to_string() {
+                        Ok(Ok(()))
+                    } else {
+                        Ok(Err(NotAuthorized))
                     }
                 }
             }

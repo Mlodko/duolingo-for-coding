@@ -9,7 +9,9 @@ use axum::{
     routing::put,
     Json, Router,
 };
+use sqlx::MySql;
 use sqlx::MySqlPool;
+use sqlx::Transaction;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -43,7 +45,8 @@ pub async fn start(db_pool: Arc<Mutex<MySqlPool>>) -> Result<(), std::io::Error>
     Ok(())
 }
 
-async fn authorize(headers: HeaderMap, state: &AppState) -> Result<(), impl IntoResponse> {
+// Check if the request comes with a valid auth token
+async fn validate_token(headers: HeaderMap, tx : &mut Transaction<'static, MySql>) -> Result<Uuid, impl IntoResponse> {
     let token = match headers.get(header::AUTHORIZATION).unwrap().to_str() {
         Ok(token_str) => match Uuid::parse_str(token_str) {
             Ok(id) => id,
@@ -56,28 +59,23 @@ async fn authorize(headers: HeaderMap, state: &AppState) -> Result<(), impl Into
         }
     };
 
-    let db_pool = state.db_pool.lock().await;
-    let mut tx = match db_pool.begin().await {
-        Ok(tx) => tx,
-        Err(_) => {
-            return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
-        }
-    };
-
-    let auth_result = User::check_authorization(&Some(token), &mut tx).await;
+    let auth_result = User::check_token_validity(&Some(token), tx).await;
 
     match auth_result {
         Ok(result) => {
             if let Err(e) = result {
                 match e {
                     AuthorizationError::NoTokenInUser => {
-                        return Err((StatusCode::BAD_REQUEST, "No token in user").into_response());
+                        return Err(StatusCode::BAD_REQUEST.into_response());
                     }
                     AuthorizationError::TokenExpired => {
-                        return Err((StatusCode::FORBIDDEN, "Token expired").into_response());
+                        return Err(StatusCode::FORBIDDEN.into_response());
                     }
                     AuthorizationError::TokenNotInDatabse => {
-                        return Err((StatusCode::UNAUTHORIZED, "Invalid token").into_response());
+                        return Err(StatusCode::UNAUTHORIZED.into_response());
+                    }
+                    _ => {
+                        return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
                     }
                 }
             }
@@ -87,9 +85,45 @@ async fn authorize(headers: HeaderMap, state: &AppState) -> Result<(), impl Into
         }
     };
     
-    tx.commit().await.unwrap();
-    Ok(())
+    Ok(token)
 }
+
+// Check if the request comes with a valid auth token and the user id is the same as the one in the token
+pub async fn check_authorization(headers: HeaderMap, user_id : &Uuid, tx : &mut Transaction<'static, MySql>) -> Result<(), impl IntoResponse> {
+    let token = match validate_token(headers.clone(), tx).await {
+        Ok(token) => token,
+        Err(e) => {
+            return Err(e.into_response());
+        }
+    };
+    
+    match User::check_authorization(token, user_id, tx).await {
+        Ok(result) => {
+            if let Err(e) = result {
+                match e {
+                    AuthorizationError::NotAuthorized => {
+                        Err(StatusCode::FORBIDDEN.into_response())
+                    }
+                    _ => {
+                        Err(StatusCode::INTERNAL_SERVER_ERROR.into_response())
+                    }
+                }
+            } else {
+                Ok(())
+            }
+        },
+        Err(_) => {
+            Err(StatusCode::INTERNAL_SERVER_ERROR.into_response())
+        }
+    }
+}
+
+async fn get_transaction(state: AppState) -> Result<Transaction<'static, MySql>, impl IntoResponse> {
+    state.db_pool.lock().await
+        .begin().await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+}
+
 
 async fn test() -> impl IntoResponse {
     StatusCode::OK
@@ -105,12 +139,9 @@ mod user {
     }
     
     pub async fn login(State(state): State<AppState>, Json(form): Json<LoginForm>) -> impl IntoResponse {
-        let db_pool = state.db_pool.lock().await;
-        let mut tx = match db_pool.begin().await {
+        let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
-            Err(_) => {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
+            Err(e) => return e.into_response(),
         };
         
         match User::login(form.username, form.password_hash, &mut tx).await {
@@ -143,12 +174,9 @@ mod user {
         State(state): State<AppState>,
         Json(form): Json<RegisterForm>,
     ) -> impl IntoResponse {
-        let db_pool = state.db_pool.lock().await;
-        let mut tx = match db_pool.begin().await {
+        let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
-            Err(_) => {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
+            Err(e) => return e.into_response(),
         };
         
         match User::new(form.username, form.password_hash, form.email, form.phone, &mut tx).await {
@@ -174,18 +202,15 @@ mod user {
         State(state): State<AppState>,
         Json(user): Json<User>,
     ) -> axum::http::Response<axum::body::Body> {
-        if let Err(err_response) = authorize(headers, &state).await {
+        let mut tx = match get_transaction(state).await {
+            Ok(tx) => tx,
+            Err(e) => return e.into_response(),
+        };
+        
+        if let Err(err_response) = check_authorization(headers, &user.id, &mut tx).await {
             return err_response.into_response();
         }
-    
-        let db_pool = state.db_pool.lock().await;
-        let mut tx = match db_pool.begin().await {
-            Ok(tx) => tx,
-            Err(_) => {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-        };
-    
+        
         match user.update(&mut tx).await {
             Ok(_) => {
                 tx.commit().await.unwrap();
@@ -225,7 +250,12 @@ mod user {
         State(state): State<AppState>,
         Path(id_str): Path<String>,
     ) -> impl IntoResponse {
-        if let Err(err_response) = authorize(headers, &state).await {
+        let mut tx = match get_transaction(state).await {
+            Ok(tx) => tx,
+            Err(e) => return e.into_response(),
+        };
+        
+        if let Err(err_response) = validate_token(headers, &mut tx).await {
             return err_response.into_response();
         }
     
@@ -233,14 +263,6 @@ mod user {
             Ok(id) => id,
             Err(_) => {
                 return StatusCode::BAD_REQUEST.into_response();
-            }
-        };
-    
-        let db_pool = state.db_pool.lock().await;
-        let mut tx = match db_pool.begin().await {
-            Ok(tx) => tx,
-            Err(_) => {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
             }
         };
     
@@ -261,11 +283,10 @@ mod user {
         State(state): State<AppState>,
         Path(id_str) : Path<String>,
     ) -> impl IntoResponse {
-        if let Err(err_response) = authorize(headers, &state).await {
-            return err_response.into_response();
-        }
-        
-        // TODO check if user id is the same as the one in the token
+        let mut tx = match get_transaction(state).await {
+            Ok(tx) => tx,
+            Err(e) => return e.into_response(),
+        };
         
         let id = match Uuid::parse_str(&id_str) {
             Ok(id) => id,
@@ -274,14 +295,10 @@ mod user {
             }
         };
     
-        let db_pool = state.db_pool.lock().await;
-        let mut tx = match db_pool.begin().await {
-            Ok(tx) => tx,
-            Err(_) => {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-        };
-    
+        if let Err(err_response) = check_authorization(headers, &id, &mut tx).await {
+            return err_response.into_response();
+        }
+        
         match User::delete(id, &mut tx).await {
             Ok(_) => {
                 tx.commit().await.unwrap();
@@ -303,15 +320,11 @@ mod task {
             }
         };
     
-        let db_pool = state.db_pool.lock().await;
-        let mut tx = match db_pool.begin().await {
+        let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
-            Err(_) => {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
+            Err(e) => return e.into_response(),
         };
 
-        
         let task = Task::read(id, &mut tx).await;
         match task {
             Ok(task) => {
@@ -339,7 +352,12 @@ mod answer {
         headers: HeaderMap,
     ) -> impl IntoResponse {
         
-        if let Err(err_response) = authorize(headers, &state).await {
+        let mut tx = match get_transaction(state).await {
+            Ok(tx) => tx,
+            Err(e) => return e.into_response(),
+        };
+        
+        if let Err(err_response) = validate_token(headers, &mut tx).await {
             return err_response.into_response();
         }
         
@@ -347,14 +365,6 @@ mod answer {
             Ok(id) => id,
             Err(_) => {
                 return StatusCode::BAD_REQUEST.into_response();
-            }
-        };
-        
-        let db_pool = state.db_pool.lock().await;
-        let mut tx = match db_pool.begin().await {
-            Ok(tx) => tx,
-            Err(_) => {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
             }
         };
         
@@ -383,17 +393,15 @@ mod answer {
         State(state): State<AppState>,
         Json(answer): Json<Answer>,
     ) -> impl IntoResponse {
-        if let Err(err_response) = authorize(headers, &state).await {
+        
+        let mut tx = match get_transaction(state).await {
+            Ok(tx) => tx,
+            Err(e) => return e.into_response(),
+        };
+        
+        if let Err(err_response) = check_authorization(headers, &answer.user_id, &mut tx).await {
             return err_response.into_response();
         }
-        
-        let db_pool = state.db_pool.lock().await;
-        let mut tx = match db_pool.begin().await {
-            Ok(tx) => tx,
-            Err(_) => {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-        };
        
         match answer.create(&mut tx).await {
             Ok(_) => StatusCode::CREATED.into_response(),
@@ -406,17 +414,15 @@ mod answer {
         State(state): State<AppState>,
         Json(answer): Json<Answer>,
     ) -> impl IntoResponse {
-        if let Err(err_response) = authorize(headers, &state).await {
+        
+        let mut tx = match get_transaction(state).await {
+            Ok(tx) => tx,
+            Err(e) => return e.into_response(),
+        };
+        
+        if let Err(err_response) = check_authorization(headers, &answer.user_id, &mut tx).await {
             return err_response.into_response();
         }
-        
-        let db_pool = state.db_pool.lock().await;
-        let mut tx = match db_pool.begin().await {
-            Ok(tx) => tx,
-            Err(_) => {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-        };
         
         match answer.update(&mut tx).await {
             Ok(_) => StatusCode::OK.into_response(),
@@ -429,9 +435,11 @@ mod answer {
         State(state): State<AppState>,
         Path(id_str): Path<String>,
     ) -> impl IntoResponse {
-        if let Err(err_response) = authorize(headers, &state).await {
-            return err_response.into_response();
-        }
+        
+        let mut tx = match get_transaction(state).await {
+            Ok(tx) => tx,
+            Err(e) => return e.into_response(),
+        };
         
         let id = match Uuid::parse_str(&id_str) {
             Ok(id) => id,
@@ -440,13 +448,9 @@ mod answer {
             }
         };
         
-        let db_pool = state.db_pool.lock().await;
-        let mut tx = match db_pool.begin().await {
-            Ok(tx) => tx,
-            Err(_) => {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-        };
+        if let Err(err_response) = check_authorization(headers, &id, &mut tx).await {
+            return err_response.into_response();
+        }
         
         match Answer::delete(id, &mut tx).await {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
