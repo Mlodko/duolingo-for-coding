@@ -130,6 +130,8 @@ async fn test() -> impl IntoResponse {
 }
 
 mod user {
+    use axum::http::Response;
+
     use super::*;
     
     #[derive(serde::Deserialize, Debug)]
@@ -151,7 +153,7 @@ mod user {
                 axum::http::Response::builder()
                     .status(StatusCode::OK)
                     .header(header::AUTHORIZATION, user.auth_token.unwrap().to_string())
-                    .body("".into())
+                    .body(user.id.to_string().into())
                     .unwrap()
             },
             

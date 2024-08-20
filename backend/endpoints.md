@@ -51,7 +51,7 @@ Requires:
 ```
 
 Returns:
-- `200 OK` with a valid auth token in the response AUTHORIZATION header
+- `200 OK` with a valid auth token in the response AUTHORIZATION header with the user id as json
 - `403 FORBIDDEN` - if the credentials are wrong
 - `500 INTERNAL SERVER ERROR`
 ---
