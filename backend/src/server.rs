@@ -16,15 +16,15 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-const IP_ADDRESS: &str = "127.0.0.1";
-const PORT: u32 = 8080;
+const DEFAULT_IP_ADDRESS: &str = "127.0.0.1";
+const DEFAULT_PORT: u32 = 8080;
 
 #[derive(Clone)]
 struct AppState {
     db_pool: Arc<Mutex<MySqlPool>>,
 }
 
-pub async fn start(db_pool: Arc<Mutex<MySqlPool>>) -> Result<(), std::io::Error> {
+pub async fn start(db_pool: Arc<Mutex<MySqlPool>>, ip_address: Option<&str>, port: Option<u32>) -> Result<(), std::io::Error> {
     let app = Router::new()
         .route("/test", get(test))
         
@@ -38,7 +38,7 @@ pub async fn start(db_pool: Arc<Mutex<MySqlPool>>) -> Result<(), std::io::Error>
         .route("/answer", post(answer::post).put(answer::put).delete(answer::delete))
         .route("/answer/:id", get(answer::get))
         .with_state(AppState { db_pool });
-    let listener = tokio::net::TcpListener::bind(format!("{}:{}", IP_ADDRESS, PORT))
+    let listener = tokio::net::TcpListener::bind(format!("{}:{}", ip_address.unwrap_or(DEFAULT_IP_ADDRESS), port.unwrap_or(DEFAULT_PORT)))
         .await?;
     axum::serve(listener, app)
         .await?;
@@ -469,15 +469,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_endpoint() {
-        let db_pool = database::get_database_connection_pool().await.unwrap();
+        let db_pool = database::get_database_connection_pool(None).await.unwrap();
 
         // Start the server in a separate Tokio task
-        tokio::spawn(start(db_pool));
+        tokio::spawn(start(db_pool, None, None));
 
         // Give the server a moment to start
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-        let response = reqwest::get(format!("http://{}:{}/test", IP_ADDRESS, PORT))
+        let response = reqwest::get(format!("http://{}:{}/test", DEFAULT_IP_ADDRESS, DEFAULT_PORT))
             .await
             .expect("Failed to execute request.");
 

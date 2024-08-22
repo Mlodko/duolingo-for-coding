@@ -261,7 +261,7 @@ pub mod database {
         
         #[tokio::test]
         async fn test_create() {
-            let binding = database::get_database_connection_pool().await.unwrap();
+            let binding = database::get_database_connection_pool(None).await.unwrap();
             let pool = binding.lock().await;
             let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
             let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
@@ -275,7 +275,7 @@ pub mod database {
         
         #[tokio::test]
         async fn test_read() {
-            let binding = database::get_database_connection_pool().await.unwrap();
+            let binding = database::get_database_connection_pool(None).await.unwrap();
             let pool = binding.lock().await;
             let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
             let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
@@ -307,7 +307,7 @@ pub mod database {
     
         #[tokio::test]
         async fn test_update() {
-            let binding = database::get_database_connection_pool().await.unwrap();
+            let binding = database::get_database_connection_pool(None).await.unwrap();
             let pool = binding.lock().await;
             let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
             let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
@@ -330,7 +330,7 @@ pub mod database {
         
         #[tokio::test]
         async fn test_delete() {
-            let binding = database::get_database_connection_pool().await.unwrap();
+            let binding = database::get_database_connection_pool(None).await.unwrap();
             let pool = binding.lock().await;
             let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
             let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);

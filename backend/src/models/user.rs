@@ -372,7 +372,7 @@ pub mod database {
 
         #[tokio::test]
         async fn test_create() {
-            let binding = db::get_database_connection_pool().await.unwrap();
+            let binding = db::get_database_connection_pool(None).await.unwrap();
             let pool = binding.lock().await;
             let mut tx = pool.begin().await.unwrap();
 
@@ -389,7 +389,7 @@ pub mod database {
 
         #[tokio::test]
         async fn test_read() {
-            let binding = db::get_database_connection_pool().await.unwrap();
+            let binding = db::get_database_connection_pool(None).await.unwrap();
             let pool = binding.lock().await;
             let mut tx = pool.begin().await.unwrap();
 
@@ -408,7 +408,7 @@ pub mod database {
 
         #[tokio::test]
         async fn test_update() {
-            let binding = db::get_database_connection_pool().await.unwrap();
+            let binding = db::get_database_connection_pool(None).await.unwrap();
             let pool = binding.lock().await;
             let mut tx = pool.begin().await.unwrap();
 
@@ -432,7 +432,7 @@ pub mod database {
 
         #[tokio::test]
         async fn test_delete() {
-            let binding = db::get_database_connection_pool().await.unwrap();
+            let binding = db::get_database_connection_pool(None).await.unwrap();
             let pool = binding.lock().await;
             let mut tx = pool.begin().await.unwrap();
 
@@ -490,7 +490,7 @@ mod tests {
         let mut deserialized = deserialized.unwrap();
         
         deserialized.id = user.id;
-        deserialized.password_hash = user.password_hash.clone();
+        deserialized.password_hash.clone_from(&user.password_hash);
         
         assert_eq!(deserialized, user);
     }

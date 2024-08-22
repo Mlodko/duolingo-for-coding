@@ -126,7 +126,7 @@ pub mod database {
         
         #[tokio::test]
         async fn test_create() {
-            let binding = crate::database::get_database_connection_pool().await.expect("Couldn't get pool");
+            let binding = crate::database::get_database_connection_pool(None).await.expect("Couldn't get pool");
             let pool = binding.lock().await;
             let mut transaction = pool.begin().await.expect("Couldn't begin transaction");
             
@@ -141,7 +141,7 @@ pub mod database {
         
         #[tokio::test]
         async fn test_read() {
-            let binding = crate::database::get_database_connection_pool().await.expect("Couldn't get pool");
+            let binding = crate::database::get_database_connection_pool(None).await.expect("Couldn't get pool");
             let pool = binding.lock().await;
             let mut transaction = pool.begin().await.expect("Couldn't begin transaction");
             
@@ -160,7 +160,7 @@ pub mod database {
         
         #[tokio::test]
         async fn test_update() {
-            let binding = crate::database::get_database_connection_pool().await.expect("Couldn't get pool");
+            let binding = crate::database::get_database_connection_pool(None).await.expect("Couldn't get pool");
             let pool = binding.lock().await;
             let mut transaction = pool.begin().await.expect("Couldn't begin transaction");
             
@@ -183,7 +183,7 @@ pub mod database {
         
         #[tokio::test]
         async fn test_delete() {
-            let binding = crate::database::get_database_connection_pool().await.expect("Couldn't get pool");
+            let binding = crate::database::get_database_connection_pool(None).await.expect("Couldn't get pool");
             let pool = binding.lock().await;
             let mut transaction = pool.begin().await.expect("Couldn't begin transaction");
             
