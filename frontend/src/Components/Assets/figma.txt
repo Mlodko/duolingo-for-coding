@@ -1,7 +1,0 @@
-Dev mode:
-https://www.figma.com/design/2MPqBJFCFf7Hf6LjWJh4QS/Key_samurai_menu1?m=dev&node-id=0-1&t=5R5WlVvpphKBjd5z-1
-prototype:
-https://www.figma.com/proto/2MPqBJFCFf7Hf6LjWJh4QS/Key_samurai_menu1?node-id=0-1&t=5R5WlVvpphKBjd5z-1
-
-embed code:
-<iframe style="border: 1px solid rgba(0, 0, 0, 0.1);" width="800" height="450" src="https://www.figma.com/embed?embed_host=share&url=https%3A%2F%2Fwww.figma.com%2Fdesign%2F2MPqBJFCFf7Hf6LjWJh4QS%2FKey_samurai_menu1%3Fnode-id%3D0-1%26t%3D5R5WlVvpphKBjd5z-1" allowfullscreen></iframe>

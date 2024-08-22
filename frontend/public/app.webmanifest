@@ -1,0 +1,16 @@
+{
+  "name": "code samurai - duolingo for coding",
+  "short_name": "codesamurai",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c002e",
+  "theme_color": "#0c002e",
+  "description": "a Duolingo-inspired web-app for everyone wanting to learn programming languages",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/png"
+    }
+  ]
+}
