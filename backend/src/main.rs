@@ -14,6 +14,7 @@ FLAGS:
 -l, --logs : Enable logging into stdout
 
 ARGUMENTS:
+--key <[]> :                    The API key for the AI service (REQUIRED)
 --ip-address <[].[].[].[]> :    The ip address to bind the server to. Default is 127.0.0.1
 --port <[]> :                   The port to bind the server to. Default is 8080
 --db-pool-size <[]> :           The size of the database connection pool. Default is 10
@@ -29,6 +30,10 @@ async fn main() {
             return;
         }
     };
+    
+    if let Some(key) = args.api_key.as_deref() {
+        std::env::set_var("DUOLINGO_APP_API_KEY", key);
+    }
     
     let db_pool = match database::get_database_connection_pool(args.db_pool_size).await {
         Ok(pool) => pool,
@@ -47,6 +52,7 @@ struct AppArgs {
     ip_address : Option<String>,
     port : Option<u32>,
     db_pool_size : Option<u32>,
+    api_key: Option<String>
 }
 
 fn parse_args() -> Result<Option<AppArgs>, Error> {
@@ -57,8 +63,13 @@ fn parse_args() -> Result<Option<AppArgs>, Error> {
         return Ok(None);
     }
     
+    if !p_args.contains("--key") && std::env::var("DUOLINGO_APP_API_KEY").is_err() {
+        eprintln!("Error: API key is required.");
+        return Ok(None);
+    }
+    
     if p_args.contains(["-l", "--logs"]) {
-        println!("[INFO]: Logging enabled.")
+        println!("[INFO]: Logging enabled. (Not really for now)")
         // TODO enable logging
     }
     
@@ -66,6 +77,7 @@ fn parse_args() -> Result<Option<AppArgs>, Error> {
         ip_address : p_args.opt_value_from_str("--ip-address")?,
         port : p_args.opt_value_from_str("--port")?,
         db_pool_size : p_args.opt_value_from_str("--db-pool-size")?,
+        api_key : p_args.value_from_str("--key").ok()
     };
     
     let remaining = p_args.finish();
