@@ -15,6 +15,7 @@ use sqlx::Transaction;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
+use tracing::{info, warn, error};
 
 const DEFAULT_IP_ADDRESS: &str = "127.0.0.1";
 const DEFAULT_PORT: u32 = 8080;
@@ -40,8 +41,12 @@ pub async fn start(db_pool: Arc<Mutex<MySqlPool>>, ip_address: Option<&str>, por
         .with_state(AppState { db_pool });
     let listener = tokio::net::TcpListener::bind(format!("{}:{}", ip_address.unwrap_or(DEFAULT_IP_ADDRESS), port.unwrap_or(DEFAULT_PORT)))
         .await?;
+
+    info!("Server started on {}:{}", ip_address.unwrap_or(DEFAULT_IP_ADDRESS), port.unwrap_or(DEFAULT_PORT));
+
     axum::serve(listener, app)
-        .await?;
+        .await?;  
+
     Ok(())
 }
 

@@ -2,6 +2,7 @@
 //use mongodb::{Client, options::ClientOptions, Database, bson::doc};
 //use bcrypt::{DEFAULT_COST, hash, verify};
 use pico_args::{Arguments, Error};
+use tracing::info;
 
 mod models;
 mod server;
@@ -69,8 +70,10 @@ fn parse_args() -> Result<Option<AppArgs>, Error> {
     }
     
     if p_args.contains(["-l", "--logs"]) {
-        println!("[INFO]: Logging enabled. (Not really for now)")
-        // TODO enable logging
+        let subscriber = tracing_subscriber::fmt().finish();
+        tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+        
+        info!("logging enabled");
     }
     
     let args = AppArgs {
