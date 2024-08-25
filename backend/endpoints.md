@@ -40,7 +40,7 @@ Returns:
 
 `/user/login`
 ### Methods
-#### GET
+#### POST
 Requires:
 - JSON like this:
 ```json

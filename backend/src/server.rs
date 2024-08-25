@@ -29,7 +29,7 @@ pub async fn start(db_pool: Arc<Mutex<MySqlPool>>, ip_address: Option<&str>, por
         .route("/test", get(test))
         
         .route("/user", put(user::put))
-        .route("/user/login", get(user::login))
+        .route("/user/login", post(user::login))
         .route("/user/register", post(user::register))
         .route("/user/:id", get(user::get).delete(user::delete))
         
