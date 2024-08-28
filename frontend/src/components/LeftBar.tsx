@@ -24,7 +24,7 @@ export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
     <>
       <nav className="fixed bottom-0 left-0 top-0 hidden flex-col gap-5 border-r-2 border-pink-ish bg-black p-3 md:flex lg:w-64 lg:p-5">
         <div className="flex">
-          <img src={mainLogo.src} height={90} width={90}/>
+          <img src={mainLogo.src} alt="main logo" height={90} width={90}/>
           <Link
             href="/"
             className="mb-5 ml-3 mt-5 hidden text-3xl font-bold text-pink-ish lg:block"

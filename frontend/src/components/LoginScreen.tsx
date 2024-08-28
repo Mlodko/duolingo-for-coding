@@ -83,6 +83,18 @@ export const LoginScreen = ({
           <h2 className="text-center text-2xl font-bold text-white">
             {loginScreenState === "LOGIN" ? "log in" : "create your profile"}
           </h2>
+          {loginScreenState === "SIGNUP" && (
+              <>
+                <div className="relative flex grow">
+                  <input
+                    className="text-black grow rounded-2xl px-4 py-3"
+                    placeholder="your username"
+                    ref={nameInputRef}
+                  />
+                </div>
+              </>
+            )}
+
           <div className="flex flex-col gap-2 text-black">
             <input
               className="grow rounded-2xl px-4 py-3"
@@ -93,6 +105,18 @@ export const LoginScreen = ({
               }
             />
           </div>
+          {loginScreenState === "SIGNUP" && (
+              <>
+                <div className="relative flex grow">
+                  <input
+                    className="text-black grow rounded-2xl px-4 py-3"
+                    placeholder="phone number (optional)"
+                    ref={nameInputRef}
+                  />
+                </div>
+              </>
+            )}
+
           <div className="flex flex-col gap-2 text-black">
             <div className="relative flex grow">
               <input
@@ -112,24 +136,14 @@ export const LoginScreen = ({
               )}
             </div>
           </div>
-          {loginScreenState === "SIGNUP" && (
-              <>
-                <div className="relative flex grow">
-                  <input
-                    className="text-black grow rounded-2xl px-4 py-3"
-                    placeholder="your username"
-                    ref={nameInputRef}
-                  />
-                </div>
-              </>
-            )}
 
           {loginScreenState === "SIGNUP" && (
             <> 
              <div className="relative flex grow">
                 <input
                   className="text-black grow rounded-2xl border-2 border-gray-200 bg-gray-50 px-4 py-3"
-                  placeholder="your age"
+                  placeholder="repeat password"
+                  type="password"
                 />
               </div>
             </>          
