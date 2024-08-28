@@ -129,6 +129,7 @@ const tileLeftClassNames = [
 
 type TileLeftClassName = (typeof tileLeftClassNames)[number];
 
+// TODO vvv Lessons reading UwU
 const getTileLeftClassName = ({
   index,
   unitNumber,
@@ -495,9 +496,6 @@ const course: NextPage = () => {
 
   const topBarColors = getTopBarColors(scrollY);
 
-  ServerTest();
-  UserLogIn("malpa dredziarz", "lubi").then(PrintCurrentUser);
-
   return (
     <>
       <TopBar
@@ -606,6 +604,7 @@ const HoverLabel = ({
   );
 };
 
+// TODO vvv Units OwO
 const UnitHeader = ({
   unitNumber,
   description,

@@ -4,6 +4,13 @@ import React, { useEffect, useRef, useState } from "react";
 import { useBoundStore } from "~/hooks/useBoundStore";
 import { useRouter } from "next/router";
 
+/*
+
+  TODO:
+      HOLY FUCKING SHIT HOW MUCH IS THERE TO DO TODAE
+
+*/
+
 export type LoginScreenState = "HIDDEN" | "LOGIN" | "SIGNUP";
 
 export const useLoginScreen = () => {
