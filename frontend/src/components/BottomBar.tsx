@@ -2,6 +2,7 @@ import Link from "next/link";
 import React, { useState } from "react";
 import type { LoginScreenState } from "./LoginScreen";
 import { useBoundStore } from "~/hooks/useBoundStore";
+import { currentUser } from "~/utils/userData";
 
 type BottomBarItem = {
   name: Tab;
@@ -11,7 +12,7 @@ type BottomBarItem = {
 export type Tab = "course" | "my account";
 
 export const useBottomBarItems = () => {
-  const loggedIn = useBoundStore((x) => x.loggedIn);
+  const loggedIn = currentUser.loggedIn;
 
   const bottomBarItems: BottomBarItem[] = [
     {
@@ -28,12 +29,13 @@ export const useBottomBarItems = () => {
 };
 
 export const BottomBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
+  // TODO vvv Log out!
   const logOut = useBoundStore((x) => x.logOut);
   const [loginScreenState, setLoginScreenState] =
     useState<LoginScreenState>("HIDDEN");
 
   const bottomBarItems = useBottomBarItems();
-  const loggedIn = useBoundStore((x) => x.loggedIn);
+  const loggedIn = currentUser.loggedIn;
   const [moreMenuShown, setMoreMenuShown] = useState(false);
 
 

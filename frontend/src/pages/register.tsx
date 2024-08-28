@@ -9,13 +9,6 @@ import type { StaticImageData } from "next/image";
 
 const bgSnow = _bgSnow as StaticImageData;
 
-/*
-
-  TODO: fuckin make these boxes look normal
-
-
-*/
-
 const Register: NextPage = () => {
   const setLanguage = useBoundStore((x) => x.setLanguage);
   return (

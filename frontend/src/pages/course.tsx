@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActiveBookSvg,
-  LockedBookSvg,
   CheckmarkSvg,
   FastForwardSvg,
   GoldenBookSvg,
@@ -37,6 +36,8 @@ import { LoginScreen, useLoginScreen } from "~/components/LoginScreen";
 import { useBoundStore } from "~/hooks/useBoundStore";
 import type { Tile, TileType, Unit } from "~/utils/units";
 import { units } from "~/utils/units";
+
+import { PrintCurrentUser, UserRegister, UserLogIn, ServerTest } from "~/utils/backendComm";
 
 type TileStatus = "LOCKED" | "ACTIVE" | "COMPLETE";
 const bgSnow = _bgSnow as StaticImageData;
@@ -128,6 +129,7 @@ const tileLeftClassNames = [
 
 type TileLeftClassName = (typeof tileLeftClassNames)[number];
 
+// TODO vvv Lessons reading UwU
 const getTileLeftClassName = ({
   index,
   unitNumber,
@@ -602,6 +604,7 @@ const HoverLabel = ({
   );
 };
 
+// TODO vvv Units OwO
 const UnitHeader = ({
   unitNumber,
   description,

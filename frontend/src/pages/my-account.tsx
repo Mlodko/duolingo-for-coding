@@ -5,7 +5,6 @@ import {
   EditPencilSvg,
   EmptyFireSvg,
   FireSvg,
-  LightningProgressSvg,
 } from "~/components/Svgs";
 import Link from "next/link";
 import { Flag } from "~/components/Flag";
