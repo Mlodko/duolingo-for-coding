@@ -142,7 +142,7 @@ mod user {
     #[derive(serde::Deserialize, Debug)]
     pub struct LoginForm {
         username: String,
-        password_hash: String,
+        password: String,
     }
     
     pub async fn login(State(state): State<AppState>, Json(form): Json<LoginForm>) -> impl IntoResponse {
@@ -151,7 +151,7 @@ mod user {
             Err(e) => return e.into_response(),
         };
         
-        match User::login(form.username, form.password_hash, &mut tx).await {
+        match User::login(form.username, form.password, &mut tx).await {
             Ok(user) => {
                 tx.commit().await.unwrap();
                 
@@ -172,7 +172,7 @@ mod user {
     #[derive(serde::Deserialize, Debug)]
     pub struct RegisterForm {
         username: String,
-        password_hash: String,
+        password: String,
         email: Option<String>,
         phone: Option<String>,
     }
@@ -186,7 +186,7 @@ mod user {
             Err(e) => return e.into_response(),
         };
         
-        match User::new(form.username, form.password_hash, form.email, form.phone, &mut tx).await {
+        match User::new(form.username, form.password, form.email, form.phone, &mut tx).await {
             Ok(user) => {
                 if (user.create(&mut tx).await).is_err() {
                     return StatusCode::INTERNAL_SERVER_ERROR.into_response();

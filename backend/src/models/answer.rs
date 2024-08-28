@@ -1,4 +1,4 @@
-use serde::{ser::Error, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -345,7 +345,7 @@ mod tests {
         "#;
         
         if std::env::var("DUOLINGO_APP_API_KEY").is_err() {
-            panic!("No API key found");
+            panic!("No API key found, set it via `export DUOLINGO_APP_API_KEY=your_key`");
         }
         
         let answer = Answer::new(Uuid::new_v4(), Uuid::new_v4()).solve(

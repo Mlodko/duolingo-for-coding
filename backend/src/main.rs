@@ -33,7 +33,9 @@ async fn main() {
     };
     
     if let Some(key) = args.api_key.as_deref() {
+        dbg!(&key);
         std::env::set_var("DUOLINGO_APP_API_KEY", key);
+        dbg!(std::env::var("DUOLINGO_APP_API_KEY"));
     }
     
     let db_pool = match database::get_database_connection_pool(args.db_pool_size).await {
@@ -64,11 +66,6 @@ fn parse_args() -> Result<Option<AppArgs>, Error> {
         return Ok(None);
     }
     
-    if !p_args.contains("--key") && std::env::var("DUOLINGO_APP_API_KEY").is_err() {
-        eprintln!("Error: API key is required.");
-        return Ok(None);
-    }
-    
     if p_args.contains(["-l", "--logs"]) {
         let subscriber = tracing_subscriber::fmt().finish();
         tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
@@ -80,7 +77,7 @@ fn parse_args() -> Result<Option<AppArgs>, Error> {
         ip_address : p_args.opt_value_from_str("--ip-address")?,
         port : p_args.opt_value_from_str("--port")?,
         db_pool_size : p_args.opt_value_from_str("--db-pool-size")?,
-        api_key : p_args.value_from_str("--key").ok()
+        api_key : p_args.opt_value_from_str("--key")?
     };
     
     let remaining = p_args.finish();

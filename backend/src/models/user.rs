@@ -3,6 +3,7 @@ use sqlx::{query, MySql, Transaction};
 use uuid::Uuid;
 use regex::Regex;
 use chrono::prelude::*;
+use tracing::{error, info, warn};
 use super::serde_uuid_vec;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -65,7 +66,8 @@ pub enum UserError {
     BadEmail,
     BadPhone,
     MissingFields,
-    DatabaseError(sqlx::Error)
+    DatabaseError(sqlx::Error),
+    HashError(bcrypt::BcryptError)
 }
 
 #[derive(Debug, PartialEq)]
@@ -77,9 +79,9 @@ pub enum AuthorizationError {
 }
 
 impl User {
-    pub async fn new(username : String, password_hash : String, email: Option<String>, phone: Option<String>, transaction : &mut Transaction<'static, MySql>) -> Result<User, UserError> {
+    pub async fn new(username : String, password : String, email: Option<String>, phone: Option<String>, transaction : &mut Transaction<'static, MySql>) -> Result<User, UserError> {
         match query!(
-            "SELECT id FROM users WHERE username = ?",
+            "SELECT id FROM users WHERE username COLLATE utf8mb4_bin = ?",
             username
         ).fetch_optional(transaction.as_mut()).await {
             Ok(result) => {
@@ -110,7 +112,7 @@ impl User {
 
         Ok(User {
             id : Uuid::new_v4(),
-            password_hash: password_hash.to_string(),
+            password_hash: bcrypt::hash(password, 10).unwrap_or_else(|e| {error!("Couldn't hash password: {}", e); String::from("")}),
             username: username.to_string(),
             email,
             phone,
@@ -287,16 +289,27 @@ pub mod database {
             Ok(())
         }
 
-        pub async fn login(username : String, password_hash : String, transaction: &mut Transaction<'static, MySql>) -> Result<User, UserError> {
+        pub async fn login(username : String, password : String, transaction: &mut Transaction<'static, MySql>) -> Result<User, UserError> {
             let user_id: Uuid = match query!(
-                "SELECT id FROM users WHERE username = ? AND password_hash = ?",
-                username,
-                password_hash
+                "SELECT id, password_hash FROM users WHERE username COLLATE utf8mb4_bin = ?",
+                username
             ).fetch_optional(transaction.as_mut()).await {
                 Ok(result) => {
                     match result {
-                        Some(row) => Uuid::parse_str(row.id.as_str()).expect("Couldn't parse string into Uid"),
-                        None => return Err(UserError::BadCredentials)
+                        Some(row) => {
+                            // Check password
+                            match bcrypt::verify(password, &row.password_hash) {
+                                Ok(true) => (),
+                                Ok(false) => {
+                                    warn!("User {} (id: {}) tried to log in with wrong password", username, &row.id);
+                                    return Err(UserError::BadCredentials);
+                                },
+                                Err(e) => return Err(UserError::HashError(e))
+                            }
+                            
+                            Uuid::parse_str(row.id.as_str()).expect("Couldn't parse string into Uid")
+                        },
+                        None => return Err(UserError::NoSuchUser)
                     }
                 },
                 Err(e) => return Err(UserError::DatabaseError(e))
@@ -316,7 +329,8 @@ pub mod database {
                 Utc::now() + chrono::Days::new(14),
                 Utc::now()
             ).execute(transaction.as_mut()).await.map_err(UserError::DatabaseError)?;
-
+            
+            info!("User {} logged in, token: {}", &user.id, &user.auth_token.unwrap());
             Ok(user)
         }
 
