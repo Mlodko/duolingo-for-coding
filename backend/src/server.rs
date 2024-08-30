@@ -16,6 +16,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 use tracing::{info, warn, error};
+use tracing::span;
 
 const DEFAULT_IP_ADDRESS: &str = "127.0.0.1";
 const DEFAULT_PORT: u32 = 8080;
@@ -126,7 +127,7 @@ pub async fn check_authorization(headers: HeaderMap, user_id : &Uuid, tx : &mut 
 async fn get_transaction(state: AppState) -> Result<Transaction<'static, MySql>, impl IntoResponse> {
     state.db_pool.lock().await
         .begin().await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+        .map_err(|e| {error!("Couldn't get transaction!\nError: {}", e); StatusCode::INTERNAL_SERVER_ERROR.into_response()})
 }
 
 
@@ -146,12 +147,15 @@ mod user {
     }
     
     pub async fn login(State(state): State<AppState>, Json(form): Json<LoginForm>) -> impl IntoResponse {
+        let span = span!(tracing::Level::INFO, "login");
+        let _enter = span.enter();
+        
         let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
             Err(e) => return e.into_response(),
         };
         
-        match User::login(form.username, form.password, &mut tx).await {
+        match User::login(form.username.clone(), form.password, &mut tx).await {
             Ok(user) => {
                 tx.commit().await.unwrap();
                 
@@ -163,9 +167,39 @@ mod user {
             },
             
             Err(e) => match e {
-                UserError::BadCredentials => StatusCode::FORBIDDEN.into_response(),
-                _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-            },
+                UserError::BadCredentials => {
+                    warn!("Unsuccessful login attempt for user {}, bad credentials", &form.username);
+                    StatusCode::FORBIDDEN.into_response()
+                },
+                UserError::NoSuchUser => {
+                    warn!("Unsuccessful login attempt for user {}, no such user", &form.username);
+                    StatusCode::NOT_FOUND.into_response()
+                }
+                UserError::DatabaseError(e) => {
+                    error!("Database error: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+                UserError::BadEmail => {
+                    error!("Bad email");
+                    StatusCode::BAD_REQUEST.into_response()
+                }
+                UserError::BadPhone => {
+                    error!("Bad phone");
+                    StatusCode::BAD_REQUEST.into_response()
+                }
+                UserError::HashError(e) => {
+                    error!("Hash error: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+                UserError::MissingFields => {
+                    error!("Missing fields");
+                    StatusCode::BAD_REQUEST.into_response()
+                }
+                UserError::UsernameExists => {
+                    error!("Username exists, THIS SHOULDN'T HAPPEN, SOMETHING WENT TERRIBLLY WRONG");
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+            }
         }
     }
     
