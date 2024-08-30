@@ -3,6 +3,7 @@
 //use bcrypt::{DEFAULT_COST, hash, verify};
 use pico_args::{Arguments, Error};
 use tracing::info;
+use tracing_subscriber::fmt::format::FmtSpan;
 
 mod models;
 mod server;
@@ -67,7 +68,9 @@ fn parse_args() -> Result<Option<AppArgs>, Error> {
     }
     
     if p_args.contains(["-l", "--logs"]) {
-        let subscriber = tracing_subscriber::fmt().finish();
+        let subscriber = tracing_subscriber::fmt()
+            .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
+            .finish();
         tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
         
         info!("logging enabled");

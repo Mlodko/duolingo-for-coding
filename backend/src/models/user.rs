@@ -334,6 +334,12 @@ pub mod database {
             Ok(user)
         }
 
+        pub async fn logout(auth_token: Uuid, transaction: &mut Transaction<'static, MySql>) -> Result<(), sqlx::Error> {
+            query!("DELETE FROM sessions WHERE auth_token = ?", auth_token.to_string())
+                .execute(transaction.as_mut()).await?;
+            Ok(())
+        }
+        
         pub async fn check_token_validity(auth_token: &Option<Uuid>, transaction: &mut Transaction<'static, MySql>)
          -> Result<Result<(), AuthorizationError>, sqlx::Error> {
             use AuthorizationError::*;

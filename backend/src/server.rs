@@ -33,6 +33,7 @@ pub async fn start(db_pool: Arc<Mutex<MySqlPool>>, ip_address: Option<&str>, por
         .route("/user", put(user::put))
         .route("/user/login", post(user::login))
         .route("/user/register", post(user::register))
+        .route("/user/logout", post(user::logout))
         .route("/user/:id", get(user::get).delete(user::delete))
         
         .route("/task/:id", get(task::get))
@@ -56,11 +57,13 @@ async fn validate_token(headers: HeaderMap, tx : &mut Transaction<'static, MySql
     let token = match headers.get(header::AUTHORIZATION).unwrap().to_str() {
         Ok(token_str) => match Uuid::parse_str(token_str) {
             Ok(id) => id,
-            Err(_) => {
+            Err(e) => {
+                warn!("Couldn't parse AUTH header as UUID\nError: {}", e);
                 return Err(StatusCode::BAD_REQUEST.into_response());
             }
         },
-        Err(_) => {
+        Err(e) => {
+            warn!("Couldn't parse AUTH header as string\nError: {}", e);
             return Err(StatusCode::BAD_REQUEST.into_response());
         }
     };
@@ -72,21 +75,26 @@ async fn validate_token(headers: HeaderMap, tx : &mut Transaction<'static, MySql
             if let Err(e) = result {
                 match e {
                     AuthorizationError::NoTokenInUser => {
+                        warn!("No token in user");
                         return Err(StatusCode::BAD_REQUEST.into_response());
                     }
                     AuthorizationError::TokenExpired => {
+                        warn!("Token expired");
                         return Err(StatusCode::FORBIDDEN.into_response());
                     }
                     AuthorizationError::TokenNotInDatabse => {
+                        warn!("Token not in database");
                         return Err(StatusCode::UNAUTHORIZED.into_response());
                     }
                     _ => {
+                        error!("Other error");
                         return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
                     }
                 }
             }
         }
-        Err(_) => {
+        Err(e) => {
+            error!("Error while checking token validity: {}", e);
             return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
         }
     };
@@ -108,17 +116,29 @@ pub async fn check_authorization(headers: HeaderMap, user_id : &Uuid, tx : &mut 
             if let Err(e) = result {
                 match e {
                     AuthorizationError::NotAuthorized => {
+                        warn!("Unauthorized attempt!\nToken: {}", token);
                         Err(StatusCode::FORBIDDEN.into_response())
-                    }
+                    },
+                    AuthorizationError::TokenExpired => {
+                        warn!("Token {} expired.", token);
+                        Err(StatusCode::FORBIDDEN.into_response())
+                    },
+                    AuthorizationError::TokenNotInDatabse => {
+                        warn!("Token {} not in database.", token);
+                        Err(StatusCode::UNAUTHORIZED.into_response())
+                    },
                     _ => {
+                        error!("Other authorization error!");
                         Err(StatusCode::INTERNAL_SERVER_ERROR.into_response())
                     }
                 }
             } else {
+                info!("Authorization successful - token: {}", token);
                 Ok(())
             }
         },
-        Err(_) => {
+        Err(e) => {
+            error!("Couldn't check authorization!\nError: {}", e);
             Err(StatusCode::INTERNAL_SERVER_ERROR.into_response())
         }
     }
@@ -215,6 +235,9 @@ mod user {
         State(state): State<AppState>,
         Json(form): Json<RegisterForm>,
     ) -> impl IntoResponse {
+        let span = span!(tracing::Level::INFO, "register");
+        let _enter = span.enter();
+        
         let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
             Err(e) => return e.into_response(),
@@ -222,18 +245,43 @@ mod user {
         
         match User::new(form.username, form.password, form.email, form.phone, &mut tx).await {
             Ok(user) => {
-                if (user.create(&mut tx).await).is_err() {
+                if let Err(e) = user.create(&mut tx).await {
+                    error!("Couldn't create user in database: {}", e);
                     return StatusCode::INTERNAL_SERVER_ERROR.into_response();
                 }
-                tx.commit().await.unwrap();
+                if let Err(e) = tx.commit().await {
+                    error!("Couldn't commit transaction: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+                
+                info!("User {} registered successfully", user.username);
                 StatusCode::CREATED.into_response()
             }
             Err(e) => match e {
-                UserError::UsernameExists => StatusCode::CONFLICT.into_response(),
+                UserError::UsernameExists => {
+                    warn!("Username already exists!");
+                    StatusCode::CONFLICT.into_response()
+                },
+                
                 UserError::BadEmail | UserError::BadPhone | UserError::MissingFields => {
+                    warn!("Missing fields or bad email or phone.");
                     StatusCode::BAD_REQUEST.into_response()
                 }
-                _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+                
+                UserError::DatabaseError(e) => {
+                    error!("Database error!\nError: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+                
+                UserError::HashError(e) => {
+                    error!("Hash error!\nError: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+                
+                _ => {
+                    error!("Other error!");
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                },
             },
         }
     }
@@ -243,6 +291,9 @@ mod user {
         State(state): State<AppState>,
         Json(user): Json<User>,
     ) -> axum::http::Response<axum::body::Body> {
+        let span = span!(tracing::Level::INFO, "user update");
+        let _enter = span.enter();
+        
         let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
             Err(e) => return e.into_response(),
@@ -254,10 +305,17 @@ mod user {
         
         match user.update(&mut tx).await {
             Ok(_) => {
-                tx.commit().await.unwrap();
+                if let Err(e) = tx.commit().await {
+                    error!("Couldn't commit transaction: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+                info!("Successfully updated user {}", &user.username);
                 StatusCode::OK.into_response()
             },
-            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            Err(e) => {
+                error!("Couldn't update user {}\nError: {}", user.username, e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            },
         }
     }
     
@@ -291,6 +349,9 @@ mod user {
         State(state): State<AppState>,
         Path(id_str): Path<String>,
     ) -> impl IntoResponse {
+        let span = span!(tracing::Level::INFO, "user get");
+        let _enter = span.enter();
+        
         let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
             Err(e) => return e.into_response(),
@@ -303,19 +364,40 @@ mod user {
         let id = match Uuid::parse_str(&id_str) {
             Ok(id) => id,
             Err(_) => {
+                warn!("Invalid UUID: {}", id_str);
                 return StatusCode::BAD_REQUEST.into_response();
             }
         };
     
         match User::read(id, &mut tx).await {
             Ok(user) => {
-                tx.commit().await.unwrap();
-                axum::http::Response::builder()
+                if let Err(e) = tx.commit().await {
+                    error!("Couldn't commit transaction: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+                
+                let json = match serde_json::to_string(&UserInfo::from_user(user)) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        error!("Couldn't serialize user info to JSON: {}", e);
+                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                    }
+                };
+                
+                match axum::http::Response::builder()
                     .status(StatusCode::OK)
-                    .body(serde_json::to_string(&UserInfo::from_user(user)).unwrap().into())
-                    .unwrap()
+                    .body(json.into()) {
+                        Ok(response) => response,
+                        Err(e) => {
+                            error!("Couldn't build response: {}", e);
+                            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                        }
+                    }
             }
-            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            Err(e) => {
+                error!("Couldn't read user from db: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            },
         }
     }
     
@@ -346,6 +428,37 @@ mod user {
                 StatusCode::OK.into_response()
             },
             Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    }
+    
+    pub async fn logout(
+        headers: HeaderMap,
+        State(state): State<AppState>,
+    ) -> impl IntoResponse {
+        let span = span!(tracing::Level::INFO, "user logout");
+        let _enter = span.enter();
+        
+        let mut tx = match get_transaction(state).await {
+            Ok(tx) => tx,
+            Err(e) => return e.into_response(),
+        };
+        
+        let token = match validate_token(headers, &mut tx).await {
+            Ok(token) => token,
+            Err(err) => return err.into_response()
+        };
+        
+        match User::logout(token, &mut tx).await {
+            Ok(_) => {
+                if let Err(e) = tx.commit().await {
+                    error!("Couldn't commit transaction: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+                StatusCode::OK.into_response()
+            },
+            Err(e) => {
+                error!("Couldn't log out! \nError: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()},
         }
     }
 }
