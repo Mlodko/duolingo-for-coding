@@ -1,5 +1,6 @@
 use crate::models::user::*;
 use crate::models::task::*;
+use axum::http::HeaderValue;
 use axum::{
     extract::{Path, State},
     http::{header, HeaderMap, StatusCode},
@@ -17,6 +18,8 @@ use tokio::sync::Mutex;
 use uuid::Uuid;
 use tracing::{info, warn, error};
 use tracing::span;
+use tower_http::cors::CorsLayer;
+use http::Method;
 
 const DEFAULT_IP_ADDRESS: &str = "127.0.0.1";
 const DEFAULT_PORT: u32 = 8080;
@@ -27,6 +30,12 @@ struct AppState {
 }
 
 pub async fn start(db_pool: Arc<Mutex<MySqlPool>>, ip_address: Option<&str>, port: Option<u32>) -> Result<(), std::io::Error> {
+    
+    let cors_layer = CorsLayer::very_permissive()
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
+        .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap());
+    
     let app = Router::new()
         .route("/test", get(test))
         
@@ -40,7 +49,9 @@ pub async fn start(db_pool: Arc<Mutex<MySqlPool>>, ip_address: Option<&str>, por
         
         .route("/answer", post(answer::post).put(answer::put).delete(answer::delete))
         .route("/answer/:id", get(answer::get))
-        .with_state(AppState { db_pool });
+        .with_state(AppState { db_pool })
+        .layer(cors_layer);
+    
     let listener = tokio::net::TcpListener::bind(format!("{}:{}", ip_address.unwrap_or(DEFAULT_IP_ADDRESS), port.unwrap_or(DEFAULT_PORT)))
         .await?;
 
