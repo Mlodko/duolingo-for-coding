@@ -10,9 +10,14 @@ import { useBoundStore } from "~/hooks/useBoundStore";
 import { Flag } from "./Flag";
 import type { LoginScreenState } from "./LoginScreen";
 import { LoginScreen } from "./LoginScreen";
+import { currentUser } from "~/utils/userData";
+
+/* 
+  TODO foookin courses babeyyy
+*/
 
 export const RightBar = () => {
-  const loggedIn = useBoundStore((x) => x.loggedIn);
+  const loggedIn = currentUser.loggedIn;
   const streak = useBoundStore((x) => x.streak);
   const language = useBoundStore((x) => x.language);
 
@@ -122,13 +127,13 @@ const CreateAProfileSection = ({
     <article className="bg-darker-purple flex flex-col gap-5 rounded-2xl border-2 border-white p-6 font-bold">
       <h2 className="text-xl">not yet signed up? do so NOW, you lil bitch</h2>
       <button
-        className="rounded-2xl border-b-4 border-dark-purple bg-dark-purple py-3 uppercase text-white transition hover:border-pink-ish hover:bg-pink-ish"
+        className="rounded-2xl border-b-4 border-dark-purple bg-dark-purple py-3 text-white transition hover:border-pink-ish hover:bg-pink-ish"
         onClick={() => setLoginScreenState("SIGNUP")}
       >
         make a profile
       </button>
       <button
-        className="rounded-2xl border-b-4 border-dark-purple bg-dark-purple py-3 uppercase text-white transition hover:border-pink-ish hover:bg-pink-ish"
+        className="rounded-2xl border-b-4 border-dark-purple bg-dark-purple py-3 text-white transition hover:border-pink-ish hover:bg-pink-ish"
         onClick={() => setLoginScreenState("LOGIN")}
       >
         sign in

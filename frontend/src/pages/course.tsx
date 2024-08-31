@@ -37,10 +37,13 @@ import { useBoundStore } from "~/hooks/useBoundStore";
 import type { Tile, TileType, Unit } from "~/utils/units";
 import { units } from "~/utils/units";
 
-import { PrintCurrentUser, UserRegister, UserLogIn, ServerTest } from "~/utils/backendComm";
+import { PrintCurrentUser, UserRegister, UserLogIn, ServerTest } from "~/utils/backendUtils";
+import { Server } from "http";
 
 type TileStatus = "LOCKED" | "ACTIVE" | "COMPLETE";
 const bgSnow = _bgSnow as StaticImageData;
+
+
 
 const tileStatus = (tile: Tile, lessonsCompleted: number): TileStatus => {
   const lessonsPerTile = 4;
@@ -483,7 +486,7 @@ const getTopBarColors = (
   }
 };
 
-const course: NextPage = () => {
+const course: NextPage = () => { 
   const { loginScreenState, setLoginScreenState } = useLoginScreen();
 
   const [scrollY, setScrollY] = useState(0);

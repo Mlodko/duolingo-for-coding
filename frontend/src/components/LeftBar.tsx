@@ -7,9 +7,20 @@ import { LoginScreen } from "./LoginScreen";
 import { useBoundStore } from "~/hooks/useBoundStore";
 import _mainLogo from "../../public/logo.svg"
 import type { StaticImageData } from "next/image";
+import { ServerTest, UserLogIn } from "~/utils/backendUtils";
+import { currentUser } from "~/utils/userData";
+
+const tryServerTest = () => {
+  try {
+    UserLogIn("testuser", "qwerty");
+    //ServerTest();
+  } catch (error) {
+    console.log("fookin error in tryin server test " + error);
+  }
+};
 
 export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
-  const loggedIn = useBoundStore((x) => x.loggedIn);
+  const loggedIn = currentUser.loggedIn;
   const logOut = useBoundStore((x) => x.logOut);
 
   const [moreMenuShown, setMoreMenuShown] = useState(false);
@@ -39,6 +50,7 @@ export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
                 {item.name === selectedTab ? (
                   <Link
                     href={item.href}
+                    onClick={tryServerTest}
                     className="flex grow items-center gap-3 rounded-xl border-2 border-pink-ish bg-dark-purple text-white px-3 py-2 text-sm font-bold"
                   >
                     <span className="sr-only lg:not-sr-only">{item.name}</span>

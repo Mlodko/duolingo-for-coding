@@ -3,6 +3,8 @@ import { CloseSvg } from "./Svgs";
 import React, { useEffect, useRef, useState } from "react";
 import { useBoundStore } from "~/hooks/useBoundStore";
 import { useRouter } from "next/router";
+import { UserLogIn, UserRegister, ServerTest } from "~/utils/backendUtils";
+import { currentUser } from "~/utils/userData";
 
 /*
 
@@ -35,12 +37,12 @@ export const LoginScreen = ({
   setLoginScreenState: React.Dispatch<React.SetStateAction<LoginScreenState>>;
 }) => {
   const router = useRouter();
-  const loggedIn = useBoundStore((x) => x.loggedIn);
-  const logIn = useBoundStore((x) => x.logIn);
-  const setUsername = useBoundStore((x) => x.setUsername);
-  const setName = useBoundStore((x) => x.setName);
+  const loggedIn = currentUser.loggedIn;
 
-  const nameInputRef = useRef<null | HTMLInputElement>(null);
+  const usernameInput = useRef<null | HTMLInputElement>(null);
+  const emailInput = useRef<null | HTMLInputElement>(null);
+  const phoneInput = useRef<null | HTMLInputElement>(null);
+  const passwordInput = useRef<null | HTMLInputElement>(null);
 
   useEffect(() => {
     if (loginScreenState !== "HIDDEN" && loggedIn) {
@@ -48,16 +50,27 @@ export const LoginScreen = ({
     }
   }, [loginScreenState, loggedIn, setLoginScreenState]);
 
-  const logInAndSetUserProperties = () => {
-    const name =
-      nameInputRef.current?.value.trim() || Math.random().toString().slice(2);
-    const username = name.replace(/ +/g, "-");
-    setUsername(username);
-    setName(name);
-    logIn();
+  const logInAndSetUserProperties = () => {    
+    const username = usernameInput.current?.value.trim()!;
+    const password = passwordInput.current?.value.trim()!;
+
+    UserLogIn(username, password).then(
+      void router.push("/course")
+    );
+  };
+
+  const registerAndSetUserProperties = () => {
+    const username = usernameInput.current?.value.trim()!;
+    const password = passwordInput.current?.value.trim()!;
+    const email = emailInput.current?.value.trim()!;
+    const phone = phoneInput.current?.value.trim()!;
+
+    const ifDone = UserRegister(username, password, email, phone);
+        
     void router.push("/course");
   };
 
+  
   return (
     <article
       className={[
@@ -90,35 +103,40 @@ export const LoginScreen = ({
           <h2 className="text-center text-2xl font-bold text-white">
             {loginScreenState === "LOGIN" ? "log in" : "create your profile"}
           </h2>
-          {loginScreenState === "SIGNUP" && (
+          {loginScreenState === "SIGNUP" ? (
               <>
                 <div className="relative flex grow">
                   <input
                     className="text-black grow rounded-2xl px-4 py-3"
                     placeholder="your username"
-                    ref={nameInputRef}
+                    ref={usernameInput}
+                  />
+                </div>
+                <div className="flex flex-col gap-2 text-black">
+                  <input
+                    className="grow rounded-2xl px-4 py-3"
+                    placeholder="your email"
+                    ref={emailInput}
                   />
                 </div>
               </>
+            ) : (
+              <div className="relative flex grow">
+                  <input
+                    className="text-black grow rounded-2xl px-4 py-3"
+                    placeholder="your username"
+                    ref={usernameInput}
+                  />
+                </div>
             )}
 
-          <div className="flex flex-col gap-2 text-black">
-            <input
-              className="grow rounded-2xl px-4 py-3"
-              placeholder={
-                loginScreenState === "LOGIN"
-                  ? "email or username"
-                  : "email"
-              }
-            />
-          </div>
           {loginScreenState === "SIGNUP" && (
               <>
                 <div className="relative flex grow">
                   <input
                     className="text-black grow rounded-2xl px-4 py-3"
                     placeholder="phone number (optional)"
-                    ref={nameInputRef}
+                    ref={phoneInput}
                   />
                 </div>
               </>
@@ -130,6 +148,7 @@ export const LoginScreen = ({
                 className="grow rounded-2xl px-4 py-3"
                 placeholder="password"
                 type="password"
+                ref={passwordInput}
               />
               {loginScreenState === "LOGIN" && (
                 <div className="absolute bottom-0 right-0 top-0 flex items-center justify-center pr-5">
@@ -151,17 +170,26 @@ export const LoginScreen = ({
                   className="text-black grow rounded-2xl border-2 border-gray-200 bg-gray-50 px-4 py-3"
                   placeholder="repeat password"
                   type="password"
+                  ref={passwordInput}
                 />
               </div>
             </>          
           )}
-
-          <button
-            className="rounded-2xl border-b-4 border-darker-purple bg-dark-purple py-3 font-bold text-white transition hover:bg-pink-ish"
-            onClick={logInAndSetUserProperties}
-          >
-            {loginScreenState === "LOGIN" ? "log in" : "create account"}
-          </button>
+          {loginScreenState === "LOGIN" ?  (
+            <button
+              className="rounded-2xl border-b-4 border-darker-purple bg-dark-purple py-3 font-bold text-white transition hover:bg-pink-ish"
+              onClick={logInAndSetUserProperties}
+            >
+              log in
+            </button>
+          ) : (
+            <button
+              className="rounded-2xl border-b-4 border-darker-purple bg-dark-purple py-3 font-bold text-white transition hover:bg-pink-ish"
+              onClick={registerAndSetUserProperties}
+            >
+              create account
+            </button>
+          )}
           <div className="flex items-center">
             <div className="h-[2px] grow bg-white"></div>
             <div className="h-[2px] grow bg-white"></div>

@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/router";
 import _lvlUpStar from "../../public/drawing-1.svg"
 import type { StaticImageData } from "next/image";
+import { currentUser } from "~/utils/userData";
 
 const lvlUpStar = _lvlUpStar as StaticImageData;
 
@@ -37,10 +38,12 @@ export default myAccount;
 
 const ProfileTopSection = () => {
   const router = useRouter();
-  const loggedIn = useBoundStore((x) => x.loggedIn);
-  const name = useBoundStore((x) => x.name);
-  const username = useBoundStore((x) => x.username);
+  const loggedIn = currentUser.loggedIn;
+  const username = currentUser.username;
+  const id = currentUser.id;
   const language = useBoundStore((x) => x.language);
+
+  if (typeof (id) === 'undefined')
 
   useEffect(() => {
     if (!loggedIn) {
@@ -51,13 +54,13 @@ const ProfileTopSection = () => {
   return (
     <section className="bg-darker-purple flex flex-row-reverse border-b-2 border-gray-200 pb-8 md:flex-row md:gap-8">
       <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-gray-400 text-3xl font-bold text-white md:h-44 md:w-44 md:text-7xl">
-        {username.charAt(0).toUpperCase()}
+        {id!.charAt(0).toUpperCase()}
       </div>
       <div className="flex grow flex-col justify-between gap-3">
         <div className="flex flex-col gap-2">
           <div>
-            <h1 className="text-2xl text-white font-bold">{name}</h1>
-            <div className="text-sm text-white">{username}</div>
+            <h1 className="text-2xl text-white font-bold">{username}</h1>
+            <div className="text-sm text-white">{id}</div>
           </div>
         </div>
         <div className="text-white flex flex-col justify-between gap-3">
