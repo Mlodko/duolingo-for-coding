@@ -2,12 +2,16 @@
 
 # Project set up
 This is a detailed guide how I run this child of satan.
-***Warning***: it is absolutely *not-secure*, *barely working* and wrote the worst way possible. Needless to say I most certainly ***do not recommend running this by yourself*** (but there you go).
+
+***Warning***: it is absolutely *not-secure*, *barely working* and written the worst way possible. Needless to say I most certainly ***do not recommend running this by yourself*** (but there you go).
 
 **Environment:** Ubuntu 22.04
+
 **Needed software:** NodeJS (npm), NextJS, Google Chrome (sic!), Rust compiler, MySQL service
 
+
 ### Follow step by step:
+
 1. Run *MySQL* service, go to *{project_dir}/backend* and run command ```sudo mysql < all_databases.sql```;
 2. Run the server - in the same directory run ```cargo run```;
 	- *(optionally)* Instead run ```cargo run -- -l``` to print logs into console, which may be helpful if this project dies during the tests.
@@ -20,4 +24,4 @@ This is a detailed guide how I run this child of satan.
 	- ***And do not try to open any other website, I warned you.***
 	- *(optionally)* Open another tab, go to *localhost:8080/test* for test endpoint check.
 	
-Questions? I don't care, we deliver it by ***friday, Sep. 6th***.
+Questions? I don't care, we deliver it by ***Friday, Sep. 6th***.
