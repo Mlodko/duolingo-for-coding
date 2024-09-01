@@ -186,7 +186,7 @@ pub mod database {
     use sqlx::{query, MySql, MySqlPool, Transaction};
     
     impl Answer {
-        pub async fn create(&self, transaction: &mut Transaction<'static, MySql>) -> Result<(), sqlx::Error> {
+        pub async fn create(&self, transaction: &mut Transaction<'static, MySql>) -> Result<Uuid, sqlx::Error> {
             query!(
                 "INSERT INTO answers (id, task_id, user_id, content) VALUES (?, ?, ?, ?)",
                 self.id.to_string(),
@@ -194,7 +194,7 @@ pub mod database {
                 self.user_id.to_string(),
                 serde_json::to_string(&self.content).expect("Couldn't serialize content")
             ).execute(transaction.as_mut()).await?;
-            Ok(())
+            Ok(self.id)
         }
         
         pub async fn read(id: Uuid, transaction: &mut Transaction<'static, MySql>) -> Result<Option<Answer>, sqlx::Error> {

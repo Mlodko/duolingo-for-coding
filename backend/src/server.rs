@@ -417,6 +417,9 @@ mod user {
         State(state): State<AppState>,
         Path(id_str) : Path<String>,
     ) -> impl IntoResponse {
+        let span = span!(tracing::Level::INFO, "user delete");
+        let _enter = span.enter();
+        
         let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
             Err(e) => return e.into_response(),
@@ -425,6 +428,7 @@ mod user {
         let id = match Uuid::parse_str(&id_str) {
             Ok(id) => id,
             Err(_) => {
+                warn!("Invalid UUID: {}", id_str);
                 return StatusCode::BAD_REQUEST.into_response();
             }
         };
@@ -435,10 +439,16 @@ mod user {
         
         match User::delete(id, &mut tx).await {
             Ok(_) => {
-                tx.commit().await.unwrap();
+                if let Err(e) = tx.commit().await {
+                    error!("Couldn't commit transaction: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+                info!("Successfully deleted user {}", id);
                 StatusCode::OK.into_response()
             },
-            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            Err(e) => {
+                error!("Couldn't delete user: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()},
         }
     }
     
@@ -478,9 +488,13 @@ mod task {
     use super::*;
    
     pub async fn get(Path(id_str): Path<String>, State(state): State<AppState>) -> impl IntoResponse {
+        let span = span!(tracing::Level::INFO, "task get");
+        let _enter = span.enter();
+        
         let id = match Uuid::parse_str(&id_str) {
             Ok(id) => id,
-            Err(_) => {
+            Err(e) => {
+                warn!("Invalid UUID: {}", e);
                 return StatusCode::BAD_REQUEST.into_response();
             }
         };
@@ -493,14 +507,24 @@ mod task {
         let task = Task::read(id, &mut tx).await;
         match task {
             Ok(task) => {
-                tx.commit().await.unwrap();
+                if let Err(e) = tx.commit().await {
+                    error!("Couldn't commit transaction: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+                info!("Successfully read task {}", id);
                 Json(task).into_response()
             },
             
             Err(e) => match e {
-                sqlx::Error::RowNotFound => StatusCode::NOT_FOUND.into_response(),
+                sqlx::Error::RowNotFound => {
+                    warn!("Entry {} not found", id);
+                    StatusCode::NOT_FOUND.into_response()
+                },
                 
-                _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+                _ => {
+                    error!("Other error!");
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                },
             },
         }
     }
@@ -509,6 +533,7 @@ mod task {
 mod answer {
     use axum::http::Response;
     use super::*;
+    use serde::Deserialize;
     use crate::models::answer::*;
     
     pub async fn get(
@@ -516,6 +541,8 @@ mod answer {
         State(state): State<AppState>,
         headers: HeaderMap,
     ) -> impl IntoResponse {
+        let span = span!(tracing::Level::INFO, "answer get");
+        let _enter = span.enter();
         
         let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
@@ -528,49 +555,102 @@ mod answer {
         
         let id = match Uuid::parse_str(&id_str) {
             Ok(id) => id,
-            Err(_) => {
+            Err(e) => {
+                warn!("Invalid UUID: {}", e);
                 return StatusCode::BAD_REQUEST.into_response();
             }
         };
         
         match Answer::read(id, &mut tx).await {
             Ok(answer) => {
-                tx.commit().await.unwrap();
+                if let Err(e) = tx.commit().await {
+                    error!("Couldn't commit transaction: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+                
                 match answer {
                     Some(answer) => {
+                        info!("Successfully read answer {}", id);
                         Response::builder()
                             .status(StatusCode::OK)
                             .body(answer.serialize().unwrap().into())
                             .unwrap()
                     },
-                    None => StatusCode::NOT_FOUND.into_response(),
+                    None => {
+                        warn!("Answer {} not found", id);
+                        StatusCode::NOT_FOUND.into_response()
+                    },
                 }
             },
             Err(e) => match e {
-                sqlx::Error::RowNotFound => StatusCode::NOT_FOUND.into_response(),
-                _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+                sqlx::Error::RowNotFound => {
+                    warn!("Answer {} not found", id);
+                    StatusCode::NOT_FOUND.into_response()
+                },
+                _ => {
+                    error!("Other error!");
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                },
             },
+        }
+    }
+    
+    #[derive(Deserialize, Debug)]
+    pub struct AnswerForm {
+        pub user_id: Uuid,
+        pub task_id: Uuid,
+        pub content: Option<crate::models::answer::AnswerContent> 
+    }
+    
+    impl AnswerForm {
+        fn into_answer(self) -> Answer {
+            Answer {
+                id: Uuid::new_v4(),
+                user_id: self.user_id,
+                task_id: self.task_id,
+                content: self.content,
+            }
         }
     }
     
     pub async fn post(
         headers: HeaderMap,
         State(state): State<AppState>,
-        Json(answer): Json<Answer>,
+        Json(answer_form): Json<AnswerForm>,
     ) -> impl IntoResponse {
+        let span = span!(tracing::Level::INFO, "answer post");
+        let _enter = span.enter();
         
         let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
             Err(e) => return e.into_response(),
         };
         
-        if let Err(err_response) = check_authorization(headers, &answer.user_id, &mut tx).await {
+        if let Err(err_response) = check_authorization(headers, &answer_form.user_id, &mut tx).await {
             return err_response.into_response();
         }
        
+        let answer = answer_form.into_answer();
+        
         match answer.create(&mut tx).await {
-            Ok(_) => StatusCode::CREATED.into_response(),
-            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            Ok(id) => {
+                info!("Answer successfully created.");
+                let response = Response::builder()
+                    .status(StatusCode::CREATED)
+                    .header("Location", format!("/answer/{}", id))
+                    .body(axum::body::Body::empty());
+                match response {
+                    Ok(response) => response,
+                    Err(e) => {
+                        error!("Couldn't create response: {}", e);
+                        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                    }
+                }
+            },
+            Err(e) => {
+                error!("Couldn't create answer: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            },
         } 
     }
     
@@ -579,6 +659,8 @@ mod answer {
         State(state): State<AppState>,
         Json(answer): Json<Answer>,
     ) -> impl IntoResponse {
+        let span = span!(tracing::Level::INFO, "answer put");
+        let _enter = span.enter();
         
         let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
@@ -590,8 +672,14 @@ mod answer {
         }
         
         match answer.update(&mut tx).await {
-            Ok(_) => StatusCode::OK.into_response(),
-            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            Ok(_) => {
+                info!("Answer {} updated", answer.id);
+                StatusCode::OK.into_response()
+            },
+            Err(e) => {
+                error!("Couldn't update answer {}: {}", answer.id, e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            },
         }
     }
     
@@ -608,7 +696,8 @@ mod answer {
         
         let id = match Uuid::parse_str(&id_str) {
             Ok(id) => id,
-            Err(_) => {
+            Err(e) => {
+                warn!("Invalid UUID: {}", e);
                 return StatusCode::BAD_REQUEST.into_response();
             }
         };
@@ -618,8 +707,14 @@ mod answer {
         }
         
         match Answer::delete(id, &mut tx).await {
-            Ok(_) => StatusCode::NO_CONTENT.into_response(),
-            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            Ok(_) => {
+                info!("Answer {} successfully deleted", id);
+                StatusCode::NO_CONTENT.into_response()
+            },
+            Err(e) => {
+                error!("Couldn't delete answer {}: {}", id, e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            },
         }
     }
 }
