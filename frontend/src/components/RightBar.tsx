@@ -17,7 +17,7 @@ import { currentUser } from "~/utils/userData";
 */
 
 export const RightBar = () => {
-  const loggedIn = currentUser.loggedIn;
+  const loggedIn = () => { return currentUser.loggedIn };
   const streak = useBoundStore((x) => x.streak);
   const language = useBoundStore((x) => x.language);
 
@@ -106,7 +106,7 @@ export const RightBar = () => {
             </div>
           </span>
         </article>
-        {!loggedIn && (
+        {!loggedIn() && (
           <CreateAProfileSection setLoginScreenState={setLoginScreenState} />
         )}
       </aside>

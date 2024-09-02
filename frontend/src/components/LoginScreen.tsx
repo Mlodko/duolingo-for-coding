@@ -54,9 +54,13 @@ export const LoginScreen = ({
     const username = usernameInput.current?.value.trim()!;
     const password = passwordInput.current?.value.trim()!;
 
-    UserLogIn(username, password).then(
-      void router.push("/course")
-    );
+    UserLogIn(username, password).then((ifLoggedIn) => {
+      if (ifLoggedIn)
+        void router.push("/course")
+      else
+        // printnot cool message
+      ;
+    });
   };
 
   const registerAndSetUserProperties = () => {
@@ -65,9 +69,13 @@ export const LoginScreen = ({
     const email = emailInput.current?.value.trim()!;
     const phone = phoneInput.current?.value.trim()!;
 
-    const ifDone = UserRegister(username, password, email, phone);
-        
-    void router.push("/course");
+    UserRegister(username, password, email, phone).then((ifRegistered) => {
+      if (ifRegistered)
+        void router.push("/course");
+      else
+        // print not cool msg
+      ;
+    })        
   };
 
   

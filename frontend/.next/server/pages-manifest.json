@@ -1,8 +1,8 @@
 {
   "/_app": "pages/_app.js",
-  "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/course": "pages/course.js",
+  "/_error": "pages/_error.js",
   "/my-account": "pages/my-account.js",
-  "/": "pages/index.js"
+  "/course": "pages/course.js",
+  "/settings/sound": "pages/settings/sound.js"
 }

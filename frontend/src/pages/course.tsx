@@ -536,8 +536,6 @@ const course: NextPage = () => {
         <RightBar />
       </div>
 
-      <div className="pt-[90px]"></div>
-
       <BottomBar selectedTab="course" />
       <LoginScreen
         loginScreenState={loginScreenState}
