@@ -165,7 +165,7 @@ export async function GetCurrentUserData() {
             const response = await fetch(SERVER + ENDP_USER + `/` + currentUser.id, {
                 method: "GET",
                 headers: {
-                    'Content-Type': 'application/json', 
+                    'Content-Type': 'application/json',
                     'Authorization': currentUser.authToken!
                 },
                 mode:"cors"

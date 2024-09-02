@@ -37,45 +37,63 @@ export const LoginScreen = ({
   setLoginScreenState: React.Dispatch<React.SetStateAction<LoginScreenState>>;
 }) => {
   const router = useRouter();
-  const loggedIn = currentUser.loggedIn;
+  const loggedIn = () => { return currentUser.loggedIn };
 
   const usernameInput = useRef<null | HTMLInputElement>(null);
   const emailInput = useRef<null | HTMLInputElement>(null);
   const phoneInput = useRef<null | HTMLInputElement>(null);
   const passwordInput = useRef<null | HTMLInputElement>(null);
+  const repeatPasswordInput = useRef<null | HTMLInputElement>(null);
+
+  const [ifLoginFailed, loginFails] = useState(false);
+  const [ifRegisterFailed, registerFails] = useState(false);
+  const [ifPasswordsMismatch, passwordMismatch] = useState(false);
 
   useEffect(() => {
-    if (loginScreenState !== "HIDDEN" && loggedIn) {
+    if (loginScreenState !== "HIDDEN" && loggedIn()) {
       setLoginScreenState("HIDDEN");
     }
   }, [loginScreenState, loggedIn, setLoginScreenState]);
 
   const logInAndSetUserProperties = () => {    
+    passwordMismatch(false);
+    loginFails(false);
+    registerFails(false);
+
     const username = usernameInput.current?.value.trim()!;
     const password = passwordInput.current?.value.trim()!;
 
     UserLogIn(username, password).then((ifLoggedIn) => {
-      if (ifLoggedIn)
+      if (ifLoggedIn) {
         void router.push("/course")
-      else
-        // printnot cool message
-      ;
+      } else {
+        loginFails(!ifLoginFailed);
+      }
     });
   };
 
   const registerAndSetUserProperties = () => {
+    passwordMismatch(false);
+    loginFails(false);
+    registerFails(false);
+
     const username = usernameInput.current?.value.trim()!;
     const password = passwordInput.current?.value.trim()!;
     const email = emailInput.current?.value.trim()!;
     const phone = phoneInput.current?.value.trim()!;
 
-    UserRegister(username, password, email, phone).then((ifRegistered) => {
-      if (ifRegistered)
-        void router.push("/course");
-      else
-        // print not cool msg
-      ;
-    })        
+    if (password != repeatPasswordInput.current?.value.trim()) {
+      passwordMismatch(true);
+    }
+    else {
+      UserRegister(username, password, email, phone).then((ifRegistered) => {
+        if (ifRegistered) {
+          void router.push("/course");
+        } else {
+          registerFails(!ifRegisterFailed);
+        }
+      })
+    }        
   };
 
   
@@ -99,9 +117,9 @@ export const LoginScreen = ({
         </button>
         <button
           className="hidden rounded-2xl border-2 border-b-4 border-white px-4 py-3 text-m font-bold text-white transition hover:bg-white hover:text-darker-purple sm:block"
-          onClick={() =>
-            setLoginScreenState((x) => (x === "LOGIN" ? "SIGNUP" : "LOGIN"))
-          }
+          onClick={() => {
+            setLoginScreenState((x) => (x === "LOGIN" ? "SIGNUP" : "LOGIN"));
+          }}
         >
           {loginScreenState === "LOGIN" ? "sign up" : "login"}
         </button>
@@ -178,22 +196,40 @@ export const LoginScreen = ({
                   className="text-black grow rounded-2xl border-2 border-gray-200 bg-gray-50 px-4 py-3"
                   placeholder="repeat password"
                   type="password"
-                  ref={passwordInput}
+                  ref={repeatPasswordInput}
                 />
               </div>
             </>          
           )}
+
+          {ifLoginFailed && loginScreenState === "LOGIN" && (
+            <p className="text-center text-xs leading-5 text-white">
+              wrong log in credentials baby, try again
+            </p>
+          )}
+
+
+          {ifPasswordsMismatch && loginScreenState === "SIGNUP" ? (
+            <p className="text-center text-xs leading-5 text-white">
+              hey, blind fuck, passwords doesn't match!
+            </p>
+          ) : ifRegisterFailed && loginScreenState === "SIGNUP" && (
+            <p className="text-center text-xs leading-5 text-white">
+              user with this username already exists, shithead - try to be unique for once
+            </p>
+          )}
+
           {loginScreenState === "LOGIN" ?  (
             <button
               className="rounded-2xl border-b-4 border-darker-purple bg-dark-purple py-3 font-bold text-white transition hover:bg-pink-ish"
-              onClick={logInAndSetUserProperties}
+              onClick={() => logInAndSetUserProperties()}
             >
               log in
             </button>
           ) : (
             <button
               className="rounded-2xl border-b-4 border-darker-purple bg-dark-purple py-3 font-bold text-white transition hover:bg-pink-ish"
-              onClick={registerAndSetUserProperties}
+              onClick={() => registerAndSetUserProperties()}
             >
               create account
             </button>
