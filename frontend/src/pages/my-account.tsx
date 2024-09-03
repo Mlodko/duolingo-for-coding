@@ -19,7 +19,7 @@ const lvlUpStar = _lvlUpStar as StaticImageData;
 
 const myAccount: NextPage = () => {
   return (
-    <div className="bg-darker-purple text-white">
+    <div className="min-h-screen bg-darker-purple text-white">
       <LeftBar selectedTab="my account" />
       <div className="bg-darker-purple flex justify-center gap-3 pt-14 md:ml-24 lg:ml-64 lg:gap-12">
         <div className="flex w-full max-w-4xl flex-col gap-5 p-5">
@@ -38,9 +38,10 @@ export default myAccount;
 
 const ProfileTopSection = () => {
   const router = useRouter();
-  const loggedIn = currentUser.loggedIn;
-  const username = currentUser.username;
-  const id = currentUser.id;
+  const loggedIn = () => { return currentUser.loggedIn };
+  const username = () => { return currentUser.username };
+  const id = () => { return currentUser.id };
+  const bio = () => { return currentUser.bio };
   const language = useBoundStore((x) => x.language);
 
   if (typeof (id) === 'undefined')
@@ -54,14 +55,18 @@ const ProfileTopSection = () => {
   return (
     <section className="bg-darker-purple flex flex-row-reverse border-b-2 border-gray-200 pb-8 md:flex-row md:gap-8">
       <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-gray-400 text-3xl font-bold text-white md:h-44 md:w-44 md:text-7xl">
-        {id!.charAt(0).toUpperCase()}
+        {username()!.charAt(0).toUpperCase()}
       </div>
       <div className="flex grow flex-col justify-between gap-3">
         <div className="flex flex-col gap-2">
           <div>
-            <h1 className="text-2xl text-white font-bold">{username}</h1>
-            <div className="text-sm text-white">{id}</div>
+            <h1 className="text-2xl text-white font-bold">{loggedIn() ? username() : "usrname"}</h1>
+            <div className="text-sm text-white">id: {id()}</div>
           </div>
+        </div>
+        <div className="text-white flex flex-col justify-between gap-3">
+          <h2 className="font-bold">bio: </h2>
+          <div className="text-sm text-white">{bio()}</div>
         </div>
         <div className="text-white flex flex-col justify-between gap-3">
           <h2 className="font-bold">your courses: </h2>

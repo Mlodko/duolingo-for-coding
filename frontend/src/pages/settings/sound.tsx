@@ -30,7 +30,7 @@ const Sound: NextPage = () => {
   ];
 
   return (
-    <div className="bg-darker-purple text-white">
+    <div className="min-h-screen bg-darker-purple text-white">
       <TopBar />
       <LeftBar selectedTab={null} />
       <BottomBar selectedTab={null} />

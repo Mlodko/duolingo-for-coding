@@ -4,24 +4,14 @@ import type { Tab } from "./BottomBar";
 import { useBottomBarItems } from "./BottomBar";
 import type { LoginScreenState } from "./LoginScreen";
 import { LoginScreen } from "./LoginScreen";
-import { useBoundStore } from "~/hooks/useBoundStore";
 import _mainLogo from "../../public/logo.svg"
 import type { StaticImageData } from "next/image";
-import { ServerTest, UserLogIn } from "~/utils/backendUtils";
+import { UserLogOut } from "~/utils/backendUtils";
 import { currentUser } from "~/utils/userData";
 
-const tryServerTest = () => {
-  try {
-    UserLogIn("testuser", "qwerty");
-    //ServerTest();
-  } catch (error) {
-    console.log("fookin error in tryin server test " + error);
-  }
-};
-
 export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
-  const loggedIn = currentUser.loggedIn;
-  const logOut = useBoundStore((x) => x.logOut);
+  const loggedIn = () => {return currentUser.loggedIn};
+  const logOut = UserLogOut;
 
   const [moreMenuShown, setMoreMenuShown] = useState(false);
   const [loginScreenState, setLoginScreenState] =
@@ -33,7 +23,7 @@ export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 top-0 hidden flex-col gap-5 border-r-2 border-pink-ish bg-black p-3 md:flex lg:w-64 lg:p-5">
+      <nav className="fixed bottom-0 left-0 top-0 flex-col gap-5 border-r-2 border-pink-ish bg-black p-3 md:flex lg:w-64 lg:p-5">
         <div className="flex">
           <img src={mainLogo.src} alt="main logo" height={90} width={90}/>
           <Link
@@ -50,17 +40,16 @@ export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
                 {item.name === selectedTab ? (
                   <Link
                     href={item.href}
-                    onClick={tryServerTest}
                     className="flex grow items-center gap-3 rounded-xl border-2 border-pink-ish bg-dark-purple text-white px-3 py-2 text-sm font-bold"
                   >
-                    <span className="sr-only lg:not-sr-only">{item.name}</span>
+                    <span className="lg:not-sr-only">{item.name}</span>
                   </Link>
                 ) : (
                   <Link
                     href={item.href}
                     className="flex grow items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-white hover:bg-pink-ish"
                   >
-                    <span className="sr-only lg:not-sr-only">{item.name}</span>
+                    <span className="lg:not-sr-only">{item.name}</span>
                   </Link>
                 )}
               </li>
@@ -73,7 +62,7 @@ export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
             role="button"
             tabIndex={0}
           >
-            <span className="hidden text-sm lg:inline">other</span>
+            <span className="text-sm lg:inline">other</span>
             <div
               className={[
                 "absolute left-full top-[-10px] min-w-[300px] rounded-2xl border-2 border-white bg-dark-purple text-left text-white",
@@ -81,7 +70,7 @@ export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
               ].join(" ")}
             >
               <div className="flex flex-col border-white py-3">
-                {!loggedIn && (
+                {!loggedIn() && (
                   <button
                     className="px-5 py-2 rounded-xl text-left hover:bg-pink-ish"
                     onClick={() => setLoginScreenState("SIGNUP")}
@@ -91,7 +80,7 @@ export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
                 )}
                 <Link
                   className="px-5 py-2 rounded-xl text-left hover:bg-pink-ish"
-                  href={loggedIn ? "/settings/account" : "/settings/sound"}
+                  href={loggedIn() ? "/settings/account" : "/settings/sound"}
                 >
                   settings
                 </Link>
@@ -101,7 +90,7 @@ export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
                 >
                   help
                 </Link>
-                {!loggedIn && (
+                {!loggedIn() && (
                   <button
                     className="px-5 py-2 rounded-xl text-left hover:bg-pink-ish"
                     onClick={() => setLoginScreenState("LOGIN")}
@@ -109,13 +98,14 @@ export const LeftBar = ({ selectedTab }: { selectedTab: Tab | null }) => {
                     sign in
                   </button>
                 )}
-                {loggedIn && (
-                  <button
+                {loggedIn() && (
+                  <Link
                     className="px-5 py-2 text-left hover:bg-pink-ish"
                     onClick={logOut}
+                    href="/"
                   >
                     sign out
-                  </button>
+                  </Link>
                 )}
               </div>
             </div>
