@@ -132,8 +132,8 @@ async fn validate_token(headers: HeaderMap, tx : &mut Transaction<'static, MySql
     Ok(token)
 }
 
-// Check if the request comes with a valid auth token and the user id is the same as the one in the token
 pub async fn check_authorization(headers: HeaderMap, user_id : &Uuid, tx : &mut Transaction<'static, MySql>) -> Result<(), impl IntoResponse> {
+//! Check if the request comes with a valid auth token and the user id is the same as the one in the token
     let token = match validate_token(headers.clone(), tx).await {
         Ok(token) => token,
         Err(e) => {
@@ -328,7 +328,7 @@ mod user {
     pub async fn put(
         headers: HeaderMap,
         State(state): State<AppState>,
-        Json(user): Json<User>,
+        Json(user_info): Json<UserInfo>,
     ) -> axum::http::Response<axum::body::Body> {
         let span = span!(tracing::Level::INFO, "user update");
         let _enter = span.enter();
@@ -336,6 +336,14 @@ mod user {
         let mut tx = match get_transaction(state).await {
             Ok(tx) => tx,
             Err(e) => return e.into_response(),
+        };
+        
+        let user = match user_info.to_user(&mut tx).await {
+            Ok(user) => user,
+            Err(e) => {
+                error!("Couldn't get user from user info: {}", e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
         };
         
         if let Err(err_response) = check_authorization(headers, &user.id, &mut tx).await {
@@ -380,6 +388,25 @@ mod user {
                 level: user.level,
                 progress: user.progress,
             }
+        }
+        
+        pub async fn to_user(self, tx: &mut Transaction<'static, MySql>) -> Result<User, sqlx::Error> {
+            let id_str = sqlx::query!("SELECT id FROM users WHERE username = ?", self.username)
+                .fetch_one(tx.as_mut()).await?.id;
+            let id = Uuid::parse_str(&id_str).expect("Invalid UUID in users DB");
+            let read_user = User::read(id, tx).await?;
+            Ok(User {
+                id,
+                password_hash: read_user.password_hash,
+                username: self.username,
+                email: self.email,
+                phone: self.phone,
+                bio: self.bio,
+                friends: self.friends,
+                level: self.level,
+                progress: self.progress,
+                auth_token: read_user.auth_token,
+            })
         }
     }
     
