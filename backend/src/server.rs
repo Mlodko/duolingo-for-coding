@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use crate::models::user::*;
 use crate::models::task::*;
 use axum::http::HeaderValue;
@@ -29,12 +31,21 @@ struct AppState {
     db_pool: Arc<Mutex<MySqlPool>>,
 }
 
+
 pub async fn start(db_pool: Arc<Mutex<MySqlPool>>, ip_address: Option<&str>, port: Option<u32>) -> Result<(), std::io::Error> {
+    
+    let origin = match "http://localhost:3000".parse::<HeaderValue>() {
+        Ok(origin) => origin,
+        Err(e) => {
+            error!("Error parsing origin: {}", e);
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid origin"));
+        }
+    };
     
     let cors_layer = CorsLayer::very_permissive()
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
-        .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap());
+        .allow_origin(origin);
     
     let app = Router::new()
         .route("/test", get(test))
@@ -65,7 +76,15 @@ pub async fn start(db_pool: Arc<Mutex<MySqlPool>>, ip_address: Option<&str>, por
 
 // Check if the request comes with a valid auth token
 async fn validate_token(headers: HeaderMap, tx : &mut Transaction<'static, MySql>) -> Result<Uuid, impl IntoResponse> {
-    let token = match headers.get(header::AUTHORIZATION).unwrap().to_str() {
+    let header_value = match headers.get(header::AUTHORIZATION) {
+        Some(auth) => auth,
+        None => {
+            warn!("No AUTH header");
+            return Err(StatusCode::BAD_REQUEST.into_response());
+        }
+    };
+    
+    let token = match header_value.to_str() {
         Ok(token_str) => match Uuid::parse_str(token_str) {
             Ok(id) => id,
             Err(e) => {
@@ -167,8 +186,6 @@ async fn test() -> impl IntoResponse {
 }
 
 mod user {
-    use axum::http::Response;
-
     use super::*;
     
     #[derive(serde::Deserialize, Debug)]
@@ -188,13 +205,24 @@ mod user {
         
         match User::login(form.username.clone(), form.password, &mut tx).await {
             Ok(user) => {
-                tx.commit().await.unwrap();
+                if let Err(e) = tx.commit().await {
+                    error!("Couldn't commit transaction!\nError: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+                
+                let auth_token = match user.auth_token {
+                    Some(token) => token,
+                    None => {
+                        error!("No auth token in user! THIS SHOULDN'T HAPPEN!");
+                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                    }
+                };
                 
                 axum::http::Response::builder()
                     .status(StatusCode::OK)
-                    .header(header::AUTHORIZATION, user.auth_token.unwrap().to_string())
+                    .header(header::AUTHORIZATION, auth_token.to_string())
                     .body(user.id.to_string().into())
-                    .unwrap()
+                    .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR.into_response())
             },
             
             Err(e) => match e {
@@ -427,8 +455,8 @@ mod user {
         
         let id = match Uuid::parse_str(&id_str) {
             Ok(id) => id,
-            Err(_) => {
-                warn!("Invalid UUID: {}", id_str);
+            Err(e) => {
+                warn!("Invalid UUID: {}", e);
                 return StatusCode::BAD_REQUEST.into_response();
             }
         };
@@ -444,7 +472,7 @@ mod user {
                     return StatusCode::INTERNAL_SERVER_ERROR.into_response();
                 }
                 info!("Successfully deleted user {}", id);
-                StatusCode::OK.into_response()
+                StatusCode::NO_CONTENT.into_response()
             },
             Err(e) => {
                 error!("Couldn't delete user: {}", e);
@@ -487,7 +515,10 @@ mod user {
 mod task {
     use super::*;
    
-    pub async fn get(Path(id_str): Path<String>, State(state): State<AppState>) -> impl IntoResponse {
+    pub async fn get(
+        Path(id_str): Path<String>, 
+        State(state): State<AppState>) -> impl IntoResponse {
+        
         let span = span!(tracing::Level::INFO, "task get");
         let _enter = span.enter();
         
@@ -571,10 +602,22 @@ mod answer {
                 match answer {
                     Some(answer) => {
                         info!("Successfully read answer {}", id);
+                        
+                        let serialized = match answer.serialize() {
+                            Ok(serialized) => serialized,
+                            Err(e) => {
+                                error!("Couldn't serialize answer: {}", e);
+                                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                            }
+                        };
+                        
                         Response::builder()
                             .status(StatusCode::OK)
-                            .body(answer.serialize().unwrap().into())
-                            .unwrap()
+                            .body(serialized.into())
+                            .unwrap_or_else(|_| {
+                                error!("Couldn't build response");
+                                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                            })
                     },
                     None => {
                         warn!("Answer {} not found", id);
@@ -721,6 +764,7 @@ mod answer {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
     use super::*;
     use crate::database;
     use reqwest::StatusCode;

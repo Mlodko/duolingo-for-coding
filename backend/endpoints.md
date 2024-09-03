@@ -1,5 +1,97 @@
-# Current endpoints
+# Structs
 
+## Answer
+```json
+{
+  "id": UUID,
+  "user_id": UUID,
+  "task_id": UUID,
+  "content": AnswerContent[?]
+}
+```
+
+## AnswerContent
+
+### Multiple choice variant
+```json
+{
+  "selected_answer_indices": [uint32]
+}
+```
+
+### Open question variant
+```json
+{
+  "content": String
+}
+```
+
+### Construct from parts variant
+
+> ***CURRENTLY UNIMPLEMENTED, BUT WILL SOON(TM)***
+
+```json
+{
+  "part_indices_order": [uint32]
+}
+```
+
+## Task
+```json
+{
+  "id": UUID,
+  "title": String,
+  "content": TaskContent,
+  "tags": [Tag]
+}
+```
+
+### Tag
+```json
+{
+  "id": UUID,
+  "name": String
+}
+```
+
+## TaskContent
+
+### Multiple Choice Variant
+```json
+{
+  "choices": [String]
+}
+```
+
+### Open Question Variant
+```json
+{
+  "content": String
+}
+```
+
+### Construct from parts variant
+
+> ***CURRENTLY UNIMPLEMENTED, BUT WILL SOON(TM)***
+
+```json
+{
+  "parts": [String]
+}
+```
+
+# Disclaimers
+
+### Json optional values
+If a value is denoted like this: 
+```json
+{
+  "Key": Type[?]
+}
+```
+it means that the value is **optional**.
+
+# Current endpoints
 ---
 
 ## Test endpoint
@@ -45,8 +137,8 @@ Requires:
 - JSON like this:
 ```json
 {
-  username: ?,
-  password_hash: ?
+  "username": String,
+  "password": String
 }
 ```
 
@@ -63,10 +155,10 @@ Requires:
 - JSON:
 ```json
 {
-  username: ?,
-  password_hash: ?,
-  email: ? (**OPTIONAL**)
-  phone: ? (**OPTIONAL**)
+  "username": String,
+  "password": String,
+  "email": String[?],
+  "phone": String[?]
 }
 ```
 > *_At least one of the email and phone fields should be filled_*
@@ -76,6 +168,15 @@ Returns:
 - `409 CONFLICT` - username already exists
 - `400 BAD REQUEST` - missing fields or malformed phone or email
 - `500 INTERNAL SERVER ERROR` 
+---
+
+`/user/logout`
+Requires:
+- valid auth token in AUTHORIZATION header
+
+Returns:
+- `200 OK`
+- `500 INTERNAL SERVER ERROR`
 ---
 
 `/user/{id}`
@@ -89,21 +190,21 @@ Returns:
 - `200 OK` with info on the selected user in JSON:
 ```json
 {
-  username: ?,
-  email: ? (OPTIONAL),
-  phone: ? (OPTIONAL),
-  bio: ? (OPTIONAL),
-  friends: [array of ids],
-  level: {
-    level: ?,
-    xp: ?
+  "username": String,
+  "email": String[?],
+  "phone": String[?],
+  "bio": String[?],
+  "friends": [String (UUID)],
+  "level": {
+    "level": uint32,
+    "xp": uint32
   },
-  progress: {
-    course: ?,
-    unit: ?,
-    sector: ?,
-    level: ?,
-    task: ?
+  "progress": {
+    "course": uint32,
+    "unit": uint32,
+    "sector": uint32,
+    "level": uint32,
+    "task": uint32
   }
 }
 ```
@@ -116,10 +217,11 @@ Requires:
 - valid user id in the path (`{id}`)
 
 Returns:
-- `200 OK`
+- `204 NO CONTENT`
 - `400 BAD REQUEST` - invalid id in path
 - `500 INTERNAL SERVER ERROR` 
 ---
+
 
 ## Task
 `/task/{id}`
@@ -131,6 +233,8 @@ Requires:
 Returns: 
 - `200 OK` with JSONized Task struct
 - `400 BAD REQUEST` - invalid id in path
+- `404 NOT FOUND` - no task with specified id
+- `500 INTERNAL SERVER ERROR`
 ---
 
 ## Answer
@@ -139,10 +243,17 @@ Returns:
 #### POST
 Requires:
 - valid auth token in AUTHORIZATION header
-- JSONized Answer struct
+- Answer form in json like this:
+```json
+{
+  "user_id": Uuid,
+  "task_id": Uuid,
+  "content": AnswerContent[?]
+}
+```
 
 Returns:
-- `201 CREATED`
+- `201 CREATED` with id in `Location` header
 - `500 INTERNAL SERVER ERROR`
 
 #### PUT
