@@ -180,8 +180,13 @@ export async function GetCurrentUserData() {
                 currentUser.phone = (respJson.phone === null ? "" : respJson.phone);
                 currentUser.bio = respJson.bio;
                 currentUser.friends = respJson.friends;
-                currentUser.level = respJson.level;
-                currentUser.progress = respJson.progress;
+                currentUser.level.level = respJson.level.level;
+                currentUser.level.XP = respJson.level.xp;
+                currentUser.progress.course = respJson.progress.course;
+                currentUser.progress.unit = respJson.progress.unit;
+                currentUser.progress.sector = respJson.progress.sector;
+                currentUser.progress.level = respJson.progress.level;
+                currentUser.progress.task = respJson.progress.task;
                 
                 console.log("user's data properply fetched from the server");
                 return true;
@@ -253,7 +258,55 @@ export async function UserLogOut() {
     return false;
 }
 
-// TODO
+// Makes use of global "currentUser", so no arguments here. Requires the user to be already logged in!
 export async function UserDataUpdate() {
 
+    try {
+        if (!currentUser.loggedIn) {
+            console.log("bro wtf, ur not even logged in, and ya want to update some data");
+            return false;
+        }
+
+        const prepData = {
+            username: currentUser.username,
+            email: currentUser.email,
+            phone: currentUser.phone,
+            bio: currentUser.bio,
+            friends: currentUser.friends,
+            level: {
+                xp: currentUser.level.XP,
+                level: currentUser.level.level
+            },
+            progress: {
+                course: currentUser.progress.course,
+                unit: currentUser.progress.unit,
+                sector: currentUser.progress.sector,
+                level: currentUser.progress.level,
+                task: currentUser.progress.task
+            }
+        };
+
+        const response = await fetch(SERVER + ENDP_USER, {
+            method: "PUT",
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': currentUser.authToken!
+            },
+            body: JSON.stringify(prepData),
+            mode: "cors"
+        })
+
+        if (response.status === 200) {
+            return GetCurrentUserData();
+        }
+        else {
+            console.log("we got " + response.status + " in UserDataUpdate");
+        }
+
+
+    } catch (error) {
+        console.log("error in UserData update: " + error);
+    }
+
+    return false;
 } 

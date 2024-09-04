@@ -96,7 +96,6 @@ export const LoginScreen = ({
     }        
   };
 
-  
   return (
     <article
       className={[

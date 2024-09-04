@@ -1,0 +1,4 @@
+type TaskChooseOne = {
+    id: string;
+    
+};
