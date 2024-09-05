@@ -1,11 +1,15 @@
 import type { NextPage } from "next";
+import { useRouter } from "next/router";
 import React, { useState } from "react";
+import { useRef } from "react";
 import { BottomBar } from "~/components/BottomBar";
 import { LeftBar } from "~/components/LeftBar";
 import { TopBar } from "~/components/TopBar";
 import { SettingsRightNav } from "~/components/SettingsRightNav";
 import { useBoundStore } from "~/hooks/useBoundStore";
 import { currentUser } from "~/utils/userData";
+import { UserDataUpdate } from "~/utils/backendUtils";
+import Link from "next/link";
 
 const Account: NextPage = () => {
   /*
@@ -13,21 +17,34 @@ const Account: NextPage = () => {
         motherfokin user data update
 
   */
-  const _username = (currentUser.username === null ? " " : currentUser.username.slice(0));
-  const _email = (currentUser.email === null ? " " : currentUser.email.slice(0));
-  const _phone = (currentUser.phone === null ? " " : currentUser.phone.slice(0));
-  const _bio = (currentUser.bio === null ? " " : currentUser.bio.slice(0));
 
-  const _newUsername = _username.slice(0);
-  const _newEmail = _email.slice(0);
-  const _newPhone = _phone.slice(0);
-  const _newBio = _bio.slice(0);
+  const [localUsername, setLocalUsername] = useState(currentUser.username);
+  const [localEmail, setLocalEmail] = useState(currentUser.email);
+  const [localPhone, setLocalPhone] = useState(currentUser.phone);
+  const [localBio, setLocalBio] = useState(currentUser.bio);
+
+  const usernameInput = useRef<null | HTMLInputElement>(null);
+  const emailInput = useRef<null | HTMLInputElement>(null);
+  const phoneInput = useRef<null | HTMLInputElement>(null);
+  const bioInput = useRef<null | HTMLInputElement>(null);
+
+  const updateUserData = () => {
+    updateDataFails(false);
+
+    UserDataUpdate().then((ifSucceeded) => {
+      if (!ifSucceeded) {
+        updateDataFails(true);
+      }
+    });     
+  }
+
+  const [ifUpdateDataFailed, updateDataFails] = useState(false);
 
   const accountOptions = [
-    { title: "username:", value: _newUsername, reference: _username },
-    { title: "email:", value: _newEmail, reference: _email },
-    { title: "phone:", value: _newPhone, reference: _phone },
-    { title: "bio:", value: _newBio, reference: _bio },
+    { title: "username:", placeholder: currentUser.username, ref: usernameInput, onChange: setLocalUsername },
+    { title: "email:", placeholder: currentUser.email, ref: emailInput, onChange: setLocalEmail },
+    { title: "phone:", placeholder: currentUser.phone, ref: phoneInput, onChange: setLocalPhone },
+    { title: "bio:", placeholder: currentUser.bio, ref: bioInput, onChange: setLocalBio },
   ];
   
   return (
@@ -40,24 +57,41 @@ const Account: NextPage = () => {
           <h1 className="font-bold text-gray-800 sm:text-2xl">
             my account
           </h1>
-          <button
-            className="rounded-2xl border-b-4 border-pink-ish bg-dark-purple px-5 py-3 font-bold uppercase text-white transition hover:bg-pink-ish hover:border-dark-purple disabled:hover:bg-dark-purple disabled:text-darker-purple disabled:border-pink-ish"
-            onClick={() => {
-              currentUser.username = _newUsername;
-              currentUser.email = _newEmail;
-              currentUser.phone = _newPhone;
-              currentUser.bio = _newBio;
-
-              // TODO: CALL USER DATA UPDATE BABYYY
-            }}
-            disabled={_username === _newUsername && _email === _newEmail && _phone === _newPhone && _bio === _newBio}
+          <Link
+            href="/settings/account"
           >
-            save changes
-          </button>
+            <button
+              className="rounded-2xl border-b-4 border-pink-ish bg-dark-purple px-5 py-3 font-bold uppercase text-white transition hover:bg-pink-ish hover:border-dark-purple disabled:hover:bg-dark-purple disabled:text-darker-purple disabled:border-pink-ish"
+              onClick={() => {
+                if (usernameInput.current?.value.trim()! !== "")
+                  currentUser.username = usernameInput.current?.value.trim()!;
+                if (emailInput.current?.value.trim()! !== "")
+                  currentUser.email = emailInput.current?.value.trim()!;
+                if (phoneInput.current?.value.trim()! !== "")
+                  currentUser.phone = phoneInput.current?.value.trim()!;
+                if (bioInput.current?.value.trim()! !== "")
+                  currentUser.bio = bioInput.current?.value.trim()!;
+
+                updateUserData();
+
+                accountOptions.map(({ ref, onChange }) => {
+                  ref.current!.value = "";
+                  onChange("");
+                });
+              }}
+              disabled={ (currentUser.username === localUsername || localUsername === "")
+                      && (currentUser.email === localEmail || localEmail === "")
+                      && (currentUser.phone === localPhone || localPhone === "")
+                      && (currentUser.bio === localBio || localBio === "")
+              } 
+            >
+              save changes
+            </button>
+          </Link>
         </div>
         <div className="flex h-full justify-center gap-12">
           <div className="flex w-full max-w-xl flex-col gap-8">
-            {accountOptions.map(({ title, value, reference }) => {
+            {accountOptions.map(({ title, placeholder, ref, onChange  }) => {
               return (
                 <div
                   key={title}
@@ -66,12 +100,18 @@ const Account: NextPage = () => {
                   <div className="font-bold sm:w-1/6">{title}</div>
                   <input
                     className="text-black font-light grow rounded-2xl border-2 p-4 py-2"
-                    value={reference}
-                    onChange={(e) => { value = e.target.value }}
+                    placeholder={placeholder}
+                    ref={ref}
+                    onChange={(e) => onChange(e.target.value)}
                   />
                 </div>
               );
             })}
+            {ifUpdateDataFailed && (
+              <p className="text-center text-xs leading-5 text-white">
+                sorry, couldn't update yo data :{"("}, try again l8r
+              </p>
+            )}
           </div>
           <SettingsRightNav selectedTab="my account" />
         </div>
