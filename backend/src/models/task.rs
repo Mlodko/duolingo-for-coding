@@ -11,6 +11,7 @@ pub struct OpenQuestionTask {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct MultipleChoiceTask {
+    pub question: String,
     pub choices: Vec<String>
 }
 
@@ -366,8 +367,6 @@ mod tests {
     use super::*;
     use crate::database;
     
-    
-    
     #[tokio::test]
     async fn test_task_serialization() {
         let task = Task::new("Test task".to_string(), TaskContent::Open(OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() }),
@@ -376,4 +375,33 @@ mod tests {
         let deserialized = Task::deserialize(&serialized).unwrap();
         assert_eq!(task, deserialized);
     }
+    
+    /*
+    #[tokio::test]
+    async fn manual_insert_tasks() {
+        /*
+        let task = Task::new("Java language type".to_string(), TaskContent::MultipleChoice(MultipleChoiceTask {question: "Which of the following Java, most certainly, is NOT?".to_string(),
+            choices: ["an imperative language", "a slow language", "a low level language", "a functional language"].iter().map(|s| s.to_string()).collect(),}), HashSet::from(
+                [Tag{id: Uuid::new_v4(), name: "theory".to_string()}, Tag{id: Uuid::new_v4(), name: "language_types".to_string()}, Tag{id: Uuid::new_v4(), name: "paradigms".to_string()}]));
+        */
+        let task = Task::new("Comparing integer values".to_string(),
+            TaskContent::Open(OpenQuestionTask { content: "Write code which declares two integer objects of values 6 and 9 respectively, and then prints the greater value.".to_string() }),
+                HashSet::from([
+                    Tag{
+                        id: Uuid::parse_str("4f30725c-41de-4b97-b368-31b3f4c9dc94").unwrap(),
+                        name: "basics".to_string()
+                    },
+                    Tag {
+                        id: Uuid::new_v4(),
+                        name: "comparing".to_string()
+                    },
+                ]));
+        let binding = database::get_database_connection_pool(None).await.unwrap();
+        let pool = binding.lock().await;
+        let mut tx = pool.begin().await.unwrap();
+        
+        assert!(task.create(&mut tx).await.is_ok());
+        tx.commit().await.unwrap();
+    }
+    */
 }
