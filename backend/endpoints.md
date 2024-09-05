@@ -59,6 +59,7 @@
 ### Multiple Choice Variant
 ```json
 {
+  "question": String,
   "choices": [String]
 }
 ```
