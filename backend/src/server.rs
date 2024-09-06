@@ -57,6 +57,8 @@ pub async fn start(db_pool: Arc<Mutex<MySqlPool>>, ip_address: Option<&str>, por
         .route("/user/:id", get(user::get).delete(user::delete))
         
         .route("/task/:id", get(task::get))
+        .route("/task/random", get(task::get_random))
+        .route("/task/next", post(task::get_other_than))
         
         .route("/answer", post(answer::post).put(answer::put).delete(answer::delete))
         .route("/answer/:id", get(answer::get))
@@ -540,6 +542,8 @@ mod user {
 }
 
 mod task {
+    use reqwest::RequestBuilder;
+
     use super::*;
    
     pub async fn get(
@@ -585,6 +589,147 @@ mod task {
                 },
             },
         }
+    }
+    
+    pub async fn get_random(State(state): State<AppState>) -> impl IntoResponse {
+        use sqlx::query;
+        use rand::seq::SliceRandom;
+        use axum::http::Response;
+        
+        let span = span!(tracing::Level::INFO, "task get random");
+        let _enter = span.enter();
+        
+        let mut tx = match get_transaction(state).await {
+            Ok(tx) => tx,
+            Err(e) => return e.into_response(),
+        };
+        
+        let task_id = match query!("SELECT id FROM tasks")
+            .fetch_all(tx.as_mut()).await {
+                Ok(records) => {
+                    let mut rng = rand::thread_rng();
+                    match records.choose(&mut rng) {
+                        Some(record) => {
+                            match uuid::Uuid::parse_str(&record.id) {
+                                Ok(id) => id,
+                                Err(e) => {
+                                    error!("Couldn't parse UUID: {}", e);
+                                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                                }
+                            }
+                        }
+                        None => {
+                            warn!("No tasks found");
+                            return StatusCode::NOT_FOUND.into_response();
+                        }
+                    }
+                },
+                Err(e) => {
+                    error!("Couldn't get random task: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            };
+        
+        let task = match Task::read(task_id, &mut tx).await {
+            Ok(task) => task,
+            Err(e) => {
+                error!("Couldn't read task: {}", e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+        
+        let json = serde_json::to_string(&task);
+        
+        if let Err(e) = json {
+            error!("Couldn't serialize task: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+        
+        match Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(json.expect("This result is an Err, THIS SHOULDN'T HAPPEN").into()) {
+                Ok(response) => response,
+                Err(e) => {
+                    error!("Couldn't build response: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+            }
+    }
+    
+    pub async fn get_other_than(
+        State(state): State<AppState>,
+        Json(task_ids): Json<Vec<Uuid>>,
+    ) -> impl IntoResponse {
+        use sqlx::query;
+        use axum::http::Response;
+        use rand::seq::SliceRandom;
+        
+        let span = span!(tracing::Level::INFO, "task get other than");
+        let _enter = span.enter();
+        
+        let mut tx = match get_transaction(state).await {
+            Ok(tx) => tx,
+            Err(e) => return e.into_response(),
+        };
+        
+        let task_id = match query!("SELECT id FROM tasks")
+            .fetch_all(tx.as_mut()).await {
+                Ok(records) => {
+                    let mut rng = rand::thread_rng();
+                    loop {
+                        match records.choose(&mut rng) {
+                            Some(record) => {
+                                match uuid::Uuid::parse_str(&record.id) {
+                                    Ok(id) => {
+                                        if !task_ids.contains(&id) {
+                                            break id;
+                                        }
+                                    },
+                                    Err(e) => {
+                                        error!("Couldn't parse UUID: {}", e);
+                                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                                    }
+                                }
+                            }
+                            None => {
+                                warn!("No tasks found");
+                                return StatusCode::NOT_FOUND.into_response();
+                            }
+                        }
+                    }
+                },
+                Err(e) => {
+                    error!("Couldn't get random task: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            };
+        
+        let task = match Task::read(task_id, &mut tx).await {
+            Ok(task) => task,
+            Err(e) => {
+                error!("Couldn't read task: {}", e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+        
+        let json = serde_json::to_string(&task);
+        
+        if let Err(e) = json {
+            error!("Couldn't serialize task: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+        
+        match Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(json.expect("This result is an Err, THIS SHOULDN'T HAPPEN").into()) {
+                Ok(response) => response,
+                Err(e) => {
+                    error!("Couldn't build response: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+            }
     }
 }
 
@@ -688,6 +833,8 @@ mod answer {
         State(state): State<AppState>,
         Json(answer_form): Json<AnswerForm>,
     ) -> impl IntoResponse {
+        use serde_json::json;
+        
         let span = span!(tracing::Level::INFO, "answer post");
         let _enter = span.enter();
         
@@ -705,10 +852,34 @@ mod answer {
         match answer.create(&mut tx).await {
             Ok(id) => {
                 info!("Answer successfully created.");
+                
+                let verify_result = match answer.verify(&mut tx).await {
+                    Ok(verify_result) => verify_result,
+                    Err(e) => {
+                        error!("Couldn't verify answer: {:#?}", e);
+                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                    }
+                };
+                
+                let mut json = match serde_json::to_value(&verify_result) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        error!("Couldn't serialize verify result: {}", e);
+                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                    }
+                };
+                
+                json["id"] = json!(id);
+                
+                if let Err(e) = tx.commit().await {
+                    error!("Couldn't commit transaction: {}", e);
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+                
                 let response = Response::builder()
                     .status(StatusCode::CREATED)
                     .header("Location", format!("/answer/{}", id))
-                    .body(axum::body::Body::empty());
+                    .body(json.to_string().into());
                 match response {
                     Ok(response) => response,
                     Err(e) => {

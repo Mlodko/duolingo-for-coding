@@ -157,6 +157,7 @@ dependencies = [
  "dotenvy",
  "http",
  "pico-args",
+ "rand",
  "regex",
  "reqwest",
  "serde",

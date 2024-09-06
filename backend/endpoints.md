@@ -238,6 +238,25 @@ Returns:
 - `500 INTERNAL SERVER ERROR`
 ---
 
+`/task/random`
+### Methods
+#### GET
+Requires: Nothing :))
+
+Returns:
+- `200 OK` with a randomly chosen task object in json
+- `404 NOT FOUND` (shouldn't happen tho) OR `500 INTERNAL SERVER ERROR` 
+
+`/task/next`
+### Methods
+#### POST
+Requires: 
+- a json array of already seen tasks's ids (they will be excluded from the rng)
+
+Returns:
+- `200 OK` with a randomly chosen task object in json
+- `404 NOT FOUND` (shouldn't happen tho) OR `500 INTERNAL SERVER ERROR` 
+
 ## Answer
 `/answer`
 ### Methods
