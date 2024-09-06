@@ -15,7 +15,7 @@
 ### Multiple choice variant
 ```json
 {
-  "selected_answer_indices": [uint32]
+  "selected_answers": [String]
 }
 ```
 
@@ -28,11 +28,18 @@
 
 ### Construct from parts variant
 
-> ***CURRENTLY UNIMPLEMENTED, BUT WILL SOON(TM)***
+```json
+{
+  "parts": [String]
+}
+```
+
+## Verification Result
 
 ```json
 {
-  "part_indices_order": [uint32]
+  "correct": bool,
+  "explanation": String? (**Only for open question variant**)
 }
 ```
 
@@ -246,6 +253,7 @@ Requires: Nothing :))
 Returns:
 - `200 OK` with a randomly chosen task object in json
 - `404 NOT FOUND` (shouldn't happen tho) OR `500 INTERNAL SERVER ERROR` 
+---
 
 `/task/next`
 ### Methods
@@ -256,6 +264,7 @@ Requires:
 Returns:
 - `200 OK` with a randomly chosen task object in json
 - `404 NOT FOUND` (shouldn't happen tho) OR `500 INTERNAL SERVER ERROR` 
+---
 
 ## Answer
 `/answer`
@@ -273,7 +282,7 @@ Requires:
 ```
 
 Returns:
-- `201 CREATED` with id in `Location` header
+- `201 CREATED` with id in `Location` header and with a Verification Result struct in the body
 - `500 INTERNAL SERVER ERROR`
 
 #### PUT
