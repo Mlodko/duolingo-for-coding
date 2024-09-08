@@ -11,6 +11,10 @@ import { Flag } from "./Flag";
 import type { LoginScreenState } from "./LoginScreen";
 import { LoginScreen } from "./LoginScreen";
 import { currentUser } from "~/utils/userData";
+import _lvlUpStar from "../../public/drawing-1.svg";
+import { StaticImageData } from "next/image";
+
+const lvlUpStar = _lvlUpStar as StaticImageData;
 
 /* 
   TODO foookin courses babeyyy
@@ -18,14 +22,13 @@ import { currentUser } from "~/utils/userData";
 
 export const RightBar = () => {
   const loggedIn = () => { return currentUser.loggedIn };
-  const streak = useBoundStore((x) => x.streak);
+  const currentLvl = () => { return currentUser.level.level};
   const language = useBoundStore((x) => x.language);
 
   const [languagesShown, setLanguagesShown] = useState(false);
 
-  const [streakShown, setStreakShown] = useState(false);
-  const [now, setNow] = useState(dayjs());
-
+  const [levelShown, setLevelShown] = useState(false);
+  
   const [loginScreenState, setLoginScreenState] =
     useState<LoginScreenState>("HIDDEN");
 
@@ -69,40 +72,38 @@ export const RightBar = () => {
               </Link>
             </div>
           </div>
+          {/* vvv Here I am gonna add latest XP changes or sth */}
           <span
-            className="relative flex items-center gap-2 rounded-xl p-3 font-bold text-white hover:bg-white"
-            onMouseEnter={() => setStreakShown(true)}
+            className="relative flex items-center gap-2 rounded-xl p-3 font-bold text-white hover:bg-pink-ish hover:text-pink-ish"
+            onMouseEnter={() => setLevelShown(true)}
             onMouseLeave={() => {
-              setStreakShown(false);
-              setNow(dayjs());
+              setLevelShown(false);
             }}
             onClick={(event) => {
               if (event.target !== event.currentTarget) return;
-              setStreakShown((x) => !x);
-              setNow(dayjs());
+              setLevelShown((x) => !x);
             }}
             role="button"
             tabIndex={0}
           >
             <div className="pointer-events-none">
-              {streak > 0 ? <FireSvg /> : <EmptyFireSvg />}
+              <img src={lvlUpStar.src} height={30} width={30}/>
             </div>
-            <span className={streak > 0 ? "text-pink-ish" : "text-white"}>
-              {streak}
+            <span className="text-white">
+              {currentLvl()}
             </span>
             <div
               className="absolute top-full z-10 flex flex-col gap-5 rounded-2xl border-2 border-white bg-white p-5 text-black"
               style={{
                 left: "calc(50% - 200px)",
                 width: 400,
-                display: streakShown ? "flex" : "none",
+                display: levelShown ? "flex" : "none",
               }}
             >
-              <h2 className="text-center text-lg font-bold">streak</h2>
+              <h2 className="text-center text-lg font-bold">your stats</h2>
               <p className="text-center text-sm font-normal text-black">
-                {`do not forget to come here every day, for a few minutes at least - or else the streak will be gone...`}
+                {`do not forget to come here every day, for a few minutes at least - or else ur gonna be another disappointment for this world...`}
               </p>
-              <Calendar now={now} setNow={setNow} />
             </div>
           </span>
         </article>

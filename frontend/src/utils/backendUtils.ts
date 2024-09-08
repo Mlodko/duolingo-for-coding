@@ -1,5 +1,6 @@
 import bcryptjs from "bcryptjs"
 import { currentUser } from "./userData";
+import { CurrentTask, CurrentTaskAnswer, TaskType, TasksDone, CurrentResult, CorrectAnswer } from "./taskData";
 
 const SERVER: string = `http://127.0.0.1:8080`;
 const ENDP_USER: string = `/user`;
@@ -7,6 +8,9 @@ const ENDP_TEST: string = `/test`;
 const ENDP_LOGIN: string = `/user/login`;
 const ENDP_REGISTER: string = `/user/register`;
 const ENDP_LOGOUT: string = `/user/logout`;
+const ENDP_TASK_RANDOM: string = `/task/random`;
+const ENDP_TASK_RANDOM_NEXT: string = `/task/next`;
+const ENDP_ANSWER: string = `/answer`;
 
 function PrintCurrentProgress() {
     console.log(
@@ -76,7 +80,7 @@ export async function UserLogIn (Username: string, Password: string) {
         if ((response).status === 200) {        
             currentUser.username = Username;
             currentUser.passwordHash = passwordHash;
-            currentUser.authToken = (response).headers.get("Authorization");
+            currentUser.authToken = (response).headers.get("authorization");
             currentUser.id = await response.text();
             currentUser.loggedIn = true;
             GetCurrentUserData();
@@ -166,7 +170,7 @@ export async function GetCurrentUserData() {
                 method: "GET",
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': currentUser.authToken!
+                    'authorization': currentUser.authToken!
                 },
                 mode:"cors"
             });    
@@ -236,8 +240,8 @@ export async function UserLogOut() {
             currentUser.phone = "";
             currentUser.username = "";
             currentUser.progress = {
-                course: "",
-                unit: "",
+                course: 0,
+                unit: 0,
                 sector: 0,
                 level: 0,
                 task: 0
@@ -310,3 +314,136 @@ export async function UserDataUpdate() {
 
     return false;
 } 
+
+export async function GetRandomTask() {
+    try {
+
+        var response;
+        
+        if (TasksDone.length === 0) 
+        {
+            response = await fetch(SERVER + ENDP_TASK_RANDOM, {
+                method: "GET",
+                mode: "cors",
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+        }
+        else {
+            response = await fetch(SERVER + ENDP_TASK_RANDOM_NEXT, {
+                method: "POST",
+                mode: "cors",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(TasksDone)
+            });
+        }
+        if (response.status === 200) {
+            const jsonData = JSON.parse(await response.text());
+            CurrentTask.ID = jsonData.id;
+            CurrentTask.Title = jsonData.title;
+            
+            if (jsonData.hasOwnProperty("MultipleChoice")) {
+                CurrentTask.Type = TaskType.MultiChoice;
+                CurrentTask.Content.Question = jsonData.MultipleChoice.question;
+                CurrentTask.Content.Data = jsonData.MultipleChoice.choices;
+
+                console.log("we got MultiChoice task");
+                return true;
+            }
+            else if (jsonData.hasOwnProperty("FromParts")) {
+                CurrentTask.Type = TaskType.Construct;
+                CurrentTask.Content.Question = jsonData.FromParts.question;
+                CurrentTask.Content.Data = jsonData.FromParts.parts;
+
+                console.log("we got Construct task");
+                return true;
+            }
+            else if (jsonData.hasOwnProperty("Open")) {
+                CurrentTask.Type = TaskType.Open;
+                CurrentTask.Content.Question = jsonData.Open.content;
+                CurrentTask.Content.Data = null;
+
+                console.log("we got MultiChoice task");
+                return true;
+            }
+            else {
+                console.log("we got sum freaky");
+                return false;
+            }
+        }
+        else {
+            console.log("we got " + response.status + " in GetRandomTask");
+        }
+
+    } catch (error) {
+        console.log("error in GetRandomTask: " + error);
+    }
+
+    return false;
+}
+
+export async function VerifyAnswer() {
+    try {
+        const prepData = {
+            user_id: currentUser.id,
+            task_id: CurrentTask.ID,
+            content: CurrentTaskAnswer.content
+        }
+
+        const resp = await fetch(SERVER + ENDP_ANSWER, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                'Content-Type': 'application/json',
+                'authorization': currentUser.authToken!
+            },
+            body: JSON.stringify(prepData)
+        })
+
+        if (resp.status === 201) {
+            CorrectAnswer.ID = resp.headers.get("Location")!;
+            const jsonData = JSON.parse(await resp.text());
+            
+            if (CurrentTask.Type === TaskType.Open)
+                CurrentResult.explanation = jsonData.explanation;
+
+            CurrentResult.ifCorrect = jsonData.correct;
+
+            if (!CurrentResult.ifCorrect)
+
+        
+            return true;
+        }
+        else {
+            console.log("we got " + resp.status + " in VerifyAnswer");
+            return false;
+        }
+    } catch (error) {
+        console.log("error in VerifyAnswer: " + error);
+    }
+
+    return false;
+}
+
+export function ClearLocalTaskData() {
+    CurrentTask.ID = "";
+    CurrentTask.Title = "";
+    CurrentTask.Type = TaskType.Open;
+    CurrentTask.Content.Data = [];
+    CurrentTask.Content.Question = "";
+
+    CurrentResult.explanation = null;
+    CurrentResult.ifCorrect = false;
+
+    CurrentTaskAnswer.UserID = "";
+    CurrentTaskAnswer.TaskID = "";
+    CurrentTaskAnswer.content.Data  = "";
+    CurrentTaskAnswer.content.Type = TaskType.Open;
+}
+
+export async function ReachCorrectAnswer() {
+    
+}

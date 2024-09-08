@@ -12,10 +12,12 @@ import { useBoundStore } from "~/hooks/useBoundStore";
 import { useEffect } from "react";
 import { useRouter } from "next/router";
 import _lvlUpStar from "../../public/drawing-1.svg"
+import _diamonds from "../../public/drawing-2.svg"
 import type { StaticImageData } from "next/image";
 import { currentUser } from "~/utils/userData";
 
 const lvlUpStar = _lvlUpStar as StaticImageData;
+const diamonds = _diamonds as StaticImageData;
 
 const myAccount: NextPage = () => {
   return (
@@ -85,35 +87,37 @@ const ProfileTopSection = () => {
 };
 
 const ProfileStatsSection = () => {
-  const streak = useBoundStore((x) => x.streak);
-  const totalXp = 125;
+  const currentLvl = () => { return currentUser.level.level }
+  const currentXP = () => { return currentUser.level.XP };
 
   return (
-    <section>
+    <section className ="grid gap-3">
       <h2 className="text-white mb-5 text-2xl font-bold">your stats</h2>
       <div className="grid grid-cols-2 gap-3">
         <div className="flex gap-2 rounded-2xl border-2 border-white p-2 md:gap-3 md:px-6 md:py-4">
-          {streak === 0 ? <EmptyFireSvg /> : <FireSvg />}
+        <img src={lvlUpStar.src} height={35} width={35}/>
           <div className="flex flex-col">
             <span
-              className={[
-                "text-xl font-bold",
-                streak === 0 ? "text-pink-ish" : "text-white",
-              ].join(" ")}
+              className={"text-white text-xl font-bold"}
             >
-              {streak}
+              {currentLvl()}
             </span>
             <span className="text-sm text-white md:text-base">
-              your streak (in days)
+              your current level
             </span>
           </div>
         </div>
         <div className="flex gap-2 rounded-2xl border-2 border-white p-2 md:gap-3 md:px-6 md:py-4">
-          <img src={lvlUpStar.src} height={35} width={35}/>
+          <img src={diamonds.src} height={45} width={45}/>
           <div className="flex flex-col">
-            <span className="text-xl text-white font-bold">{totalXp}</span>
+            <span className="text-xl text-white font-bold">{currentXP()}</span>
             <span className="text-sm text-white md:text-base">your xp</span>
           </div>
+        </div>
+      </div>
+      <div className ="grid gap-3">
+        <div className="flex gap-2 rounded-2xl border-2 border-white p-2 md:gap-3 md:px-6 md:py-4">
+          <p className="text-l text-white">some fancy thing here, init</p>
         </div>
       </div>
     </section>

@@ -37,8 +37,10 @@ import { useBoundStore } from "~/hooks/useBoundStore";
 import type { Tile, TileType, Unit } from "~/utils/units";
 import { units } from "~/utils/units";
 
-import { PrintCurrentUser, UserRegister, UserLogIn, ServerTest } from "~/utils/backendUtils";
+import { PrintCurrentUser, UserRegister, UserLogIn, ServerTest, GetRandomTask } from "~/utils/backendUtils";
 import { Server } from "http";
+import { lessonProblems } from "./lesson";
+import { currentUser } from "~/utils/userData";
 
 type TileStatus = "LOCKED" | "ACTIVE" | "COMPLETE";
 const bgSnow = _bgSnow as StaticImageData;
@@ -292,7 +294,7 @@ const TileTooltip = ({
               activeTextColor,
             ].join(" ")}
           >
-            complete for +10 XP
+            complete for +3 XP
           </Link>
         ) : status === "LOCKED" ? (
           <button
@@ -327,7 +329,7 @@ const UnitSection = ({ unit }: { unit: Unit }): JSX.Element => {
 
   const closeTooltip = useCallback(() => setSelectedTile(null), []);
 
-  const lessonsCompleted = useBoundStore((x) => x.lessonsCompleted);
+  const lessonsCompleted = () => { return currentUser.progress.level; };
   const increaseLessonsCompleted = useBoundStore(
     (x) => x.increaseLessonsCompleted,
   );
@@ -342,7 +344,7 @@ const UnitSection = ({ unit }: { unit: Unit }): JSX.Element => {
       />
       <div className="relative mb-8 mt-[67px] flex max-w-2xl flex-col items-center gap-4">
         {unit.tiles.map((tile, i): JSX.Element => {
-          const status = tileStatus(tile, lessonsCompleted);
+          const status = tileStatus(tile, lessonsCompleted());
           return (
             <Fragment key={i}>
               {(() => {
@@ -375,7 +377,7 @@ const UnitSection = ({ unit }: { unit: Unit }): JSX.Element => {
                       >
                         
                         <LessonCompletionSvg
-                          lessonsCompleted={lessonsCompleted}
+                          lessonsCompleted={lessonsCompleted()}
                           status={status}
                         />
                         <button
@@ -488,6 +490,7 @@ const getTopBarColors = (
 
 const course: NextPage = () => { 
   const { loginScreenState, setLoginScreenState } = useLoginScreen();
+  lessonProblems.length = 0;
 
   const [scrollY, setScrollY] = useState(0);
   useEffect(() => {

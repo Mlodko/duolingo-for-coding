@@ -2,8 +2,7 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/settings/account": "pages/settings/account.js",
-  "/my-account": "pages/my-account.js",
-  "/settings/sound": "pages/settings/sound.js",
-  "/course": "pages/course.js"
+  "/": "pages/index.js",
+  "/course": "pages/course.js",
+  "/lesson": "pages/lesson.js"
 }

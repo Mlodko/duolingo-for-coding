@@ -1,6 +1,6 @@
 type CourseProgress = {
-    course: string;
-    unit: string;
+    course: number;
+    unit: number;
     sector: number;
     level: number;
     task: number;
@@ -46,8 +46,8 @@ export const currentUser: User = {
     },
 
     progress: {
-        course: "",
-        unit: "",
+        course: 0,
+        unit: 0,
         sector: 0,
         level: 0,
         task: 0

@@ -13,28 +13,80 @@ import {
 } from "~/components/Svgs";
 import { useBoundStore } from "~/hooks/useBoundStore";
 import { useRouter } from "next/router";
+import { TestTask, TestAnswer } from "~/utils/taskData";
+import { currentUser } from "~/utils/userData";
+import { UserDataUpdate } from "~/utils/backendUtils";
 
-
+const EvalOpenQuestion = () => {
+  return "string";
+};
 
 const lessonProblem1 = {
+  id: "71de7dad2c8941c2b82b6321a4768342",
   type: "SELECT_1_OF_3",
-  question: `which of the following functions we should use to print "Hello world!" in console?`,
+  question: `Which of the following is a correct way to declare integer value of 5?`,
   answers: [
-    { name: `printf("%s\n", "Hello world!");`},
-    { name: `cout("Hello world!\n");` },
-    { name: `printf("%d", "Hello wordl!");` },
+    { name: `int n = \"5\";`},
+    { name: `int 5;` },
+    { name: `int n = 5;` },
+  ],
+  correctAnswer: 2,
+} as const;
+
+const lessonProblem2 = {
+  id: "1f5b9287c0e5439198b2642c8c09dc69",
+  type: "BUILD_CODE",
+  question: `Build a line of code, which properly declares a String object of value \"Hello world\"`,
+  answerTiles: [";", "String text", "'Hello", "world\"", "=", "String[] text", "\"Hello"],
+  correctAnswer: [1, 4, 6, 3, 0],
+} as const;
+
+const lessonProblem3 = {
+  id: '4af4cd88173c42e2b91a71574e7dec1c',
+  type: "BUILD_CODE",
+  question: `Build a line of code, which properly declares a Float object that has the same value as another Float object called \"floatValue\"`,
+  answerTiles: ["Float value",
+        "Float floatValue",
+        "=",
+        "new Float()",
+        ";",
+        "floatValue",
+        "float"],
+  correctAnswer: [0, 2, 5, 4],
+} as const;
+
+const lessonProblem4 = {
+  id: "da37a6e6029f4462bf4815893f462845",
+  type: "OPEN",
+  question: `Write code which declares a String object of value \"code samurai is some sick shit, duh\", and then prints it into console.`,
+  explanation: ""
+} as const;
+
+const lessonProblem5 = {
+  id: '2d7a6f58d8c41eb9bd2726306620065',
+  type: "OPEN",
+  question: `Write code which declares two integer objects of values 6 and 9 respectively, and then prints the greater value.`,
+  explanation: ""
+} as const;
+
+const lessonProblem6 = {
+  id: '2063901565d84f2b8367c4950bc9f0f9',
+  type: "SELECT_1_OF_3",
+  question: `Which of the following Java, most certainly, is NOT?`,
+  answers: [
+    { name: `a low level language` },
+    { name: `a functional language`},
+    { name: `a slow language` }
   ],
   correctAnswer: 0,
 } as const;
 
-const lessonProblem2 = {
-  type: "BUILD_CODE",
-  question: `type a correct "main" function header: `,
-  answerTiles: ["double argc", ",", ")", "char* argv", "[]", "char argv", "(", "(int argc", "int main"],
-  correctAnswer: [8, 7, 1, 3, 4, 2],
-} as const;
+const allProblems = [
+  lessonProblem1, lessonProblem2, lessonProblem3,
+  lessonProblem4, lessonProblem5, lessonProblem6
+];
 
-const lessonProblems = [lessonProblem1, lessonProblem2];
+export const lessonProblems: any[] = [];
 
 const numbersEqual = (a: readonly number[], b: readonly number[]): boolean => {
   return a.length === b.length && a.every((_, i) => a[i] === b[i]);
@@ -53,9 +105,26 @@ const formatTime = (timeMs: number): string => {
     .join(":");
 };
 
-const Lesson: NextPage = () => {
-  const router = useRouter();
+const chooseProblems = () => {
+  const usedNums: number[] = [];
 
+  while (lessonProblems.length < 3)
+  {
+    var n = Math.floor(Math.random() * 6);
+
+    while (usedNums.indexOf(n) > -1) {
+      n = Math.floor(Math.random() * 6);
+    }
+
+    usedNums.push(n);
+    lessonProblems.push(allProblems[n]);
+  }
+}
+
+var openAnswer:string = "";
+const Lesson: NextPage = () => {
+  chooseProblems();
+  const router = useRouter();
   const [lessonProblem, setLessonProblem] = useState(0);
   const [correctAnswerCount, setCorrectAnswerCount] = useState(0);
   const [incorrectAnswerCount, setIncorrectAnswerCount] = useState(0);
@@ -86,6 +155,25 @@ const Lesson: NextPage = () => {
   const isAnswerCorrect = Array.isArray(correctAnswer)
     ? numbersEqual(selectedAnswers, correctAnswer)
     : selectedAnswer === correctAnswer;
+
+  const onCheckAnswerOpen = () => {
+    const isOpenAnswerCorrect = true;
+
+    setCorrectAnswerShown(true);
+    if (isOpenAnswerCorrect) {
+      setCorrectAnswerCount((x) => x + 1);
+    } else {
+      setIncorrectAnswerCount((x) => x + 1);
+    }
+    setQuestionResults((questionResults) => [
+      ...questionResults,
+      {
+        question: problem.question!,
+        yourResponse: openAnswer,
+        correctResponse: EvalOpenQuestion(),
+      },
+    ]);
+  }
 
   const onCheckAnswer = () => {
     setCorrectAnswerShown(true);
@@ -217,6 +305,26 @@ const Lesson: NextPage = () => {
         />
       );
     }
+
+    case "OPEN": {
+      return (
+        <ProblemOpen
+          problem={problem}
+          correctAnswerCount={correctAnswerCount}
+          totalCorrectAnswersNeeded={totalCorrectAnswersNeeded}
+          selectedAnswers={selectedAnswers}
+          setSelectedAnswers={setSelectedAnswers}
+          quitMessageShown={quitMessageShown}
+          correctAnswerShown={correctAnswerShown}
+          setQuitMessageShown={setQuitMessageShown}
+          isAnswerCorrect={isAnswerCorrect}
+          onCheckAnswer={onCheckAnswerOpen}
+          onFinish={onFinish}
+          onSkip={onSkip}
+          hearts={hearts}
+        />
+      )
+    }
   }
 };
 
@@ -346,7 +454,7 @@ const CheckAnswer = ({
   isAnswerSelected: boolean;
   isAnswerCorrect: boolean;
   correctAnswerShown: boolean;
-  correctAnswer: string;
+  correctAnswer: string | null;
   onCheckAnswer: () => void;
   onFinish: () => void;
   onSkip: () => void;
@@ -404,7 +512,7 @@ const CheckAnswer = ({
                 </div>
                 <div className="flex flex-col gap-2">
                   <div className="text-2xl">expected answer:</div>{" "}
-                  <div className="text-sm font-normal">{correctAnswer}</div>
+                  <div className="text-sm font-normal">{correctAnswer!}</div>
                 </div>
               </div>
             )}
@@ -635,6 +743,98 @@ const ProblemBuildCode = ({
   );
 };
 
+const ProblemOpen = ({
+  problem,
+  correctAnswerCount,
+  totalCorrectAnswersNeeded,
+  selectedAnswers,
+  setSelectedAnswers,
+  quitMessageShown,
+  correctAnswerShown,
+  setQuitMessageShown,
+  isAnswerCorrect,
+  onCheckAnswer,
+  onFinish,
+  onSkip,
+  hearts,
+}: {
+  problem: typeof lessonProblem4;
+  correctAnswerCount: number;
+  totalCorrectAnswersNeeded: number;
+  selectedAnswers: number[];
+  setSelectedAnswers: React.Dispatch<React.SetStateAction<number[]>>;
+  correctAnswerShown: boolean;
+  quitMessageShown: boolean;
+  setQuitMessageShown: React.Dispatch<React.SetStateAction<boolean>>;
+  isAnswerCorrect: boolean;
+  onCheckAnswer: () => void;
+  onFinish: () => void;
+  onSkip: () => void;
+  hearts: number | null;
+}) => {
+  const { question, explanation, id } = problem;
+  const answerInput = {
+    text: ""
+  };
+
+  return (
+    <div className="text-white bg-darker-purple flex min-h-screen flex-col gap-5 px-4 py-5 sm:px-0 sm:py-0">
+      <div className="flex grow flex-col items-center gap-5">
+        <div className="w-full max-w-5xl sm:mt-8 sm:px-5">
+          <ProgressBar
+            correctAnswerCount={correctAnswerCount}
+            totalCorrectAnswersNeeded={totalCorrectAnswersNeeded}
+            setQuitMessageShown={setQuitMessageShown}
+            hearts={hearts}
+          />
+        </div>
+        <section className="flex max-w-2xl grow flex-col gap-6 self-center sm:items-center sm:justify-center sm:gap-24">
+          <h1 className="mb-2 text-2xl font-bold sm:text-3xl">
+            write some code UwU
+          </h1>
+
+          <div className="w-full">
+            <div className="flex items-center gap-6 px-2 py-5">
+              <div className="text-xl font-bold relative ml-2 w-fit rounded-2xl bg-dark-purple p-4">
+                {question}
+              </div>
+            </div>
+          </div>
+          <textarea 
+                className="items-left text-black grow rounded-2xl px-4 py-3 max-w-750" 
+                placeholder="write your answer here"
+                rows={8}
+                cols={100}
+                onChange={(e) => {answerInput.text = e.target.value!;}}
+              />
+
+          <div className="flex flex-wrap justify-center gap-1">
+          </div>
+        </section>
+      </div>
+
+      <CheckAnswer
+        correctAnswer={null}
+        correctAnswerShown={correctAnswerShown}
+        isAnswerCorrect={isAnswerCorrect}
+        isAnswerSelected={selectedAnswers.length > 0}
+        onCheckAnswer={() => {
+          openAnswer = answerInput.text!;
+          onCheckAnswer();
+        }}
+        onFinish={onFinish}
+        onSkip={onSkip}
+      />
+
+      <QuitMessage
+        quitMessageShown={quitMessageShown}
+        setQuitMessageShown={setQuitMessageShown}
+      />
+    </div>
+  );
+};
+
+
 const LessonComplete = ({
   correctAnswerCount,
   incorrectAnswerCount,
@@ -655,11 +855,15 @@ const LessonComplete = ({
   const router = useRouter();
   const isPractice = "practice" in router.query;
 
-  const increaseXp = useBoundStore((x) => x.increaseXp);
+  const increaseXp = () => {
+    currentUser.level.XP = currentUser.level.XP + 3;
+    UserDataUpdate();
+  };
   const addToday = useBoundStore((x) => x.addToday);
-  const increaseLessonsCompleted = useBoundStore(
-    (x) => x.increaseLessonsCompleted,
-  );
+  const increaseLessonsCompleted = () => {
+    currentUser.progress.level = currentUser.progress.level + 1;
+    UserDataUpdate();
+  }
   return (
     <div className="bg-darker-purple flex min-h-screen flex-col gap-5 px-4 py-5 sm:px-0 sm:py-0">
       <div className="flex grow flex-col items-center justify-center gap-8 font-bold">
@@ -706,7 +910,7 @@ const LessonComplete = ({
             }
             href="/course"
             onClick={() => {
-              increaseXp(correctAnswerCount);
+              increaseXp();
               addToday();
               if (!isPractice) {
                 increaseLessonsCompleted();

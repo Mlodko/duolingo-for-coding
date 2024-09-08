@@ -27,63 +27,63 @@ export type TileType = Tile["type"];
 export const units: readonly Unit[] = [
   {
     unitNumber: 1,
-    description: "adbwebrfgb",
+    description: "basic Java syntax",
     backgroundColor: "bg-pink-ish",
     textColor: "text-darker-purple",
     borderColor: "border-dark-purple",
     tiles: [
       {
         type: "book",
-        description: "fsdjv",
+        description: "variables basics",
       },
       {
         type: "book",
-        description: "fbuyewsvjdn",
+        description: "object basics",
       },
       {
         type: "book",
-        description: "fyudsjnv",
+        description: "methods basics",
       },
-      { type: "book", description: "dysbhcener" },
-      { type: "star", description: "hbfdegyvhu" },
+      { type: "book", description: "Class approach" },
+      { type: "star", description: "unit 1 - review" },
     ],
   },
   {
     unitNumber: 2,
-    description: "fydtgsh",
+    description: "some skills yet to come...",
     backgroundColor: "bg-pink-ish",
     textColor: "text-darker-purple",
     borderColor: "border-dark-purple",
     tiles: [
       {
         type: "book",
-        description: "fsdjv",
+        description: "some lesson",
       },
       {
         type: "book",
-        description: "fbuyewsvjdn",
+        description: "some lesson",
       },
       {
         type: "book",
-        description: "fyudsjnv",
+        description: "some lesson",
       },
-      { type: "book", description: "dysbhcener" },
-      { type: "dumbbell", description: "hbfdegyvhu" },
+      { type: "book", description: "some lesson" },
+      { type: "dumbbell", description: "some lesson" },
       {
         type: "book",
-        description: "fsdjv",
-      },
-      {
-        type: "book",
-        description: "fbuyewsvjdn",
+        description: "some lesson",
       },
       {
         type: "book",
-        description: "fyudsjnv",
+        description: "some lesson",
       },
-      { type: "book", description: "dysbhcener" },
-      { type: "book", description: "hbfdegyvhu" },
-      { type: "star", description: "Unit 2 review" },
+      {
+        type: "book",
+        description: "some lesson",
+      },
+      { type: "book", description: "some lesson" },
+      { type: "book", description: "some lesson" },
+      { type: "star", description: "unit 2 - review" },
     ],
   },
 ];
