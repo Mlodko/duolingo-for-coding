@@ -27,7 +27,7 @@ export type TileType = Tile["type"];
 export const units: readonly Unit[] = [
   {
     unitNumber: 1,
-    description: "basic Java syntax",
+    description: "basic syntax",
     backgroundColor: "bg-pink-ish",
     textColor: "text-darker-purple",
     borderColor: "border-dark-purple",

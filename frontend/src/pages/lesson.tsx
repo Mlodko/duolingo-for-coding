@@ -17,11 +17,6 @@ import { TestTask, TestAnswer, CurrentResult } from "~/utils/taskData";
 import { currentUser } from "~/utils/userData";
 import { UserDataUpdate, VerifyAnswer } from "~/utils/backendUtils";
 
-const EvalOpenQuestion = () => {
-
-  return "string";
-};
-
 const lessonProblem1 = {
   id: "71de7dad2c8941c2b82b6321a4768342",
   type: "SELECT_1_OF_3",
@@ -166,13 +161,16 @@ const Lesson: NextPage = () => {
     var isOpenAnswerCorrect = false;
 
     VerifyAnswer(TaskID, openAnswer).then((ifSucceeded) => {
-      if (ifSucceeded)
+      if (ifSucceeded) {
         isOpenAnswerCorrect = CurrentResult.ifCorrect;
-      else
+        explain = CurrentResult.explanation!;
+        console.log("I got results: " + explain + " | "  + isOpenAnswerCorrect );
+      }
+      else {
         checkAnswerFails(true);
+      }
     })
 
-    setCorrectAnswerShown(true);
     if (isOpenAnswerCorrect) {
       setCorrectAnswerCount((x) => x + 1);
     } else {
@@ -186,6 +184,7 @@ const Lesson: NextPage = () => {
         correctResponse: isOpenAnswerCorrect ? openAnswer : "",
       },
     ]);
+    setCorrectAnswerShown(true);
   }
 
   const onCheckAnswer = () => {
@@ -442,7 +441,7 @@ const QuitMessage = ({
             quit
           </Link>
           <button
-            className="w-full rounded-2xl py-3 font-bold uppercase text-blue-400 transition hover:brightness-90 sm:w-48 sm:border-2 sm:border-b-4 sm:border-gray-300 sm:text-gray-400 sm:hover:bg-gray-100"
+            className="w-full rounded-2xl py-3 font-bold text-blue-400 transition hover:brightness-90 sm:w-48 sm:border-2 sm:border-b-4 sm:border-gray-300 sm:text-gray-400 sm:hover:bg-gray-100"
             onClick={() => setQuitMessageShown(false)}
           >
             stay there
@@ -452,6 +451,7 @@ const QuitMessage = ({
     </>
   );
 };
+
 
 const CheckAnswer = ({
   isAnswerSelected,
@@ -470,6 +470,9 @@ const CheckAnswer = ({
   onFinish: () => void;
   onSkip: () => void;
 }) => {
+  const [answerCorrect, setAnswerCorrect] = useState(false);
+  if (correctAnswer === null)
+    isAnswerCorrect = answerCorrect;
   return (
     <>
       <section className="border-gray-200 sm:border-t-2 sm:p-10">
@@ -489,7 +492,13 @@ const CheckAnswer = ({
             </button>
           ) : (
             <button
-              onClick={onCheckAnswer}
+              onClick={() => {
+                onCheckAnswer();
+                if (correctAnswer === null) {
+                  setAnswerCorrect(CurrentResult.ifCorrect);
+                  isAnswerCorrect = answerCorrect;
+                }
+              }}
               className="grow rounded-2xl border-b-4 border-pink-ish bg-white p-3 font-bold text-darker-purple hover:bg-pink-ish hover:border-dark-purple sm:min-w-[150px] sm:max-w-fit sm:grow-0"
             >
               ready
@@ -522,8 +531,8 @@ const CheckAnswer = ({
                   <BigCloseSvg />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <div className="text-2xl">expected answer:</div>{" "}
-                  <div className="text-sm font-normal">{correctAnswer!}</div>
+                  <div className="text-2xl">{correctAnswer === null ? "explanation:" : "expected answer:"}</div>{" "}
+                  <div className="text-sm font-normal">{correctAnswer === null ? explain : correctAnswer!}</div>
                 </div>
               </div>
             )}
@@ -532,8 +541,8 @@ const CheckAnswer = ({
             onClick={onFinish}
             className={
               isAnswerCorrect
-                ? "w-full rounded-2xl border-b-4 border-darker-purple bg-pink-ish p-3 font-bold uppercase text-white transition hover:bg-darker-purple hover:border-pink-ish sm:min-w-[150px] sm:max-w-fit"
-                : "w-full rounded-2xl border-b-4 border-darker-purple bg-pink-ish p-3 font-bold uppercase text-white transition hover:bg-darker-purple hover:border-pink-ish sm:min-w-[150px] sm:max-w-fit"
+                ? "w-full rounded-2xl border-b-4 border-darker-purple bg-pink-ish p-3 font-bold text-white transition hover:bg-darker-purple hover:border-pink-ish sm:min-w-[150px] sm:max-w-fit"
+                : "w-full rounded-2xl border-b-4 border-darker-purple bg-pink-ish p-3 font-bold text-white transition hover:bg-darker-purple hover:border-pink-ish sm:min-w-[150px] sm:max-w-fit"
             }
           >
             continue
@@ -1062,12 +1071,12 @@ const LessonFastForwardStart = ({
         <div className="mx-auto flex max-w-5xl flex-col-reverse items-center gap-5 sm:flex-row sm:justify-between">
           <Link
             href="/course"
-            className="font-bold uppercase text-blue-400 transition hover:brightness-110"
+            className="font-bold text-blue-400 transition hover:brightness-110"
           >
             nah, later
           </Link>
           <button
-            className="w-full rounded-2xl border-b-4 border-blue-500 bg-blue-400 p-3 font-bold uppercase text-white transition hover:brightness-110 sm:min-w-[150px] sm:max-w-fit"
+            className="w-full rounded-2xl border-b-4 border-blue-500 bg-blue-400 p-3 font-bold text-white transition hover:brightness-110 sm:min-w-[150px] sm:max-w-fit"
             onClick={() => setIsStartingLesson(false)}
           >
             {`less gooooo`}
@@ -1103,13 +1112,13 @@ const LessonFastForwardEndFail = ({
       <section className="border-gray-200 sm:border-t-2 sm:p-10">
         <div className="mx-auto flex max-w-5xl sm:justify-between">
           <button
-            className="hidden rounded-2xl border-2 border-b-4 border-gray-200 bg-white p-3 font-bold uppercase text-gray-400 transition hover:border-gray-300 hover:bg-gray-200 sm:block sm:min-w-[150px] sm:max-w-fit"
+            className="hidden rounded-2xl border-2 border-b-4 border-gray-200 bg-white p-3 font-bold text-gray-400 transition hover:border-gray-300 hover:bg-gray-200 sm:block sm:min-w-[150px] sm:max-w-fit"
             onClick={() => setReviewLessonShown(true)}
           >
             review lesson
           </button>
           <Link
-            className="flex w-full items-center justify-center rounded-2xl border-b-4 border-green-600 bg-green-500 p-3 font-bold uppercase text-white transition hover:brightness-105 sm:min-w-[150px] sm:max-w-fit"
+            className="flex w-full items-center justify-center rounded-2xl border-b-4 border-green-600 bg-green-500 p-3 font-bold text-white transition hover:brightness-105 sm:min-w-[150px] sm:max-w-fit"
             href="/course"
           >
             continue
@@ -1149,13 +1158,13 @@ const LessonFastForwardEndPass = ({
       <section className="border-gray-200 sm:border-t-2 sm:p-10">
         <div className="mx-auto flex max-w-5xl sm:justify-between">
           <button
-            className="hidden rounded-2xl border-2 border-b-4 border-gray-200 bg-white p-3 font-bold uppercase text-gray-400 transition hover:border-gray-300 hover:bg-gray-200 sm:block sm:min-w-[150px] sm:max-w-fit"
+            className="hidden rounded-2xl border-2 border-b-4 border-gray-200 bg-white p-3 font-bold text-gray-400 transition hover:border-gray-300 hover:bg-gray-200 sm:block sm:min-w-[150px] sm:max-w-fit"
             onClick={() => setReviewLessonShown(true)}
           >
             review lesson
           </button>
           <Link
-            className="flex w-full items-center justify-center rounded-2xl border-b-4 border-green-600 bg-green-500 p-3 font-bold uppercase text-white transition hover:brightness-105 sm:min-w-[150px] sm:max-w-fit"
+            className="flex w-full items-center justify-center rounded-2xl border-b-4 border-green-600 bg-green-500 p-3 font-bold text-white transition hover:brightness-105 sm:min-w-[150px] sm:max-w-fit"
             href="/course"
             onClick={() => jumpToUnit(unitNumber)}
           >
