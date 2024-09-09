@@ -24,4 +24,4 @@ This is a detailed guide how I run this child of satan.
 	- ***And do not try to open any other website, I warned you.***
 	- *(optionally)* Open another tab, go to *localhost:8080/test* for test endpoint check.
 	
-Questions? I don't care, we deliver it by ***Friday, Sep. 6th***.
+Questions? I don't care, we deliver it by ***Monday, Sep. 9th***.
