@@ -23,7 +23,7 @@ pub struct PartsTask {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum TaskContent {
-    Open(OpenQuestionTask),
+    OpenQuestion(OpenQuestionTask),
     MultipleChoice(MultipleChoiceTask),
     FromParts(PartsTask)
 }
@@ -273,7 +273,7 @@ pub mod database {
             let pool = binding.lock().await;
             let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
             let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
-            let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
+            let task = Task::new("Test task".to_string(), TaskContent::OpenQuestion(content), tags);
             
             let mut tx = pool.begin().await.unwrap();
             let result = task.create(&mut tx).await;
@@ -287,7 +287,7 @@ pub mod database {
             let pool = binding.lock().await;
             let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
             let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
-            let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
+            let task = Task::new("Test task".to_string(), TaskContent::OpenQuestion(content), tags);
             
             let mut tx = pool.begin().await.unwrap();
             
@@ -319,7 +319,7 @@ pub mod database {
             let pool = binding.lock().await;
             let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
             let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
-            let mut task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
+            let mut task = Task::new("Test task".to_string(), TaskContent::OpenQuestion(content), tags);
             
             let mut tx = pool.begin().await.unwrap();
             
@@ -327,7 +327,7 @@ pub mod database {
             
             let new_content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google. You can use Bing".to_string() };
             task.tags.extend([Tag::new("New Tag".to_string(), &pool).await]);
-            task.content = TaskContent::Open(new_content);
+            task.content = TaskContent::OpenQuestion(new_content);
             
             let result = task.update(&mut tx).await;
             assert_eq!(result.is_ok(), true);
@@ -342,7 +342,7 @@ pub mod database {
             let pool = binding.lock().await;
             let content = OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() };
             let tags = HashSet::from([Tag::new("AI".to_string(), &pool).await, Tag::new("AGI".to_string(), &pool).await]);
-            let task = Task::new("Test task".to_string(), TaskContent::Open(content), tags);
+            let task = Task::new("Test task".to_string(), TaskContent::OpenQuestion(content), tags);
             
             let mut tx = pool.begin().await.unwrap();
             
@@ -376,9 +376,10 @@ mod tests {
     
     #[tokio::test]
     async fn test_task_serialization() {
-        let task = Task::new("Test task".to_string(), TaskContent::Open(OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() }),
+        let task = Task::new("Test task".to_string(), TaskContent::OpenQuestion(OpenQuestionTask { content: "Code an AGI. You have 2 minutes and cannot use google".to_string() }),
             HashSet::from([Tag{id: Uuid::new_v4(), name: "AI".to_string()}, Tag{id: Uuid::new_v4(), name: "Programming".to_string()}]));
-        let serialized = task.serialize().unwrap();
+        let serialized = serde_json::to_string_pretty(&task).unwrap();
+        println!("{}", &serialized);
         let deserialized = Task::deserialize(&serialized).unwrap();
         assert_eq!(task, deserialized);
     }
