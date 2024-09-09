@@ -385,12 +385,16 @@ export async function GetRandomTask() {
     return false;
 }
 
-export async function VerifyAnswer() {
+export async function VerifyAnswer(TaskID: string, Answer: string) {
     try {
         const prepData = {
             user_id: currentUser.id,
-            task_id: CurrentTask.ID,
-            content: CurrentTaskAnswer.content
+            task_id: TaskID,
+            content: {
+                OpenQuestion: { 
+                    content: Answer
+                }
+            }
         }
 
         const resp = await fetch(SERVER + ENDP_ANSWER, {
@@ -407,13 +411,14 @@ export async function VerifyAnswer() {
             CorrectAnswer.ID = resp.headers.get("Location")!;
             const jsonData = JSON.parse(await resp.text());
             
-            if (CurrentTask.Type === TaskType.Open)
+            if (jsonData.hasOwnProperty("explanation")) {
                 CurrentResult.explanation = jsonData.explanation;
+            } 
+            else {
+                CurrentResult.explanation = null;
+            }
 
             CurrentResult.ifCorrect = jsonData.correct;
-
-            if (!CurrentResult.ifCorrect)
-
         
             return true;
         }
@@ -442,8 +447,4 @@ export function ClearLocalTaskData() {
     CurrentTaskAnswer.TaskID = "";
     CurrentTaskAnswer.content.Data  = "";
     CurrentTaskAnswer.content.Type = TaskType.Open;
-}
-
-export async function ReachCorrectAnswer() {
-    
 }

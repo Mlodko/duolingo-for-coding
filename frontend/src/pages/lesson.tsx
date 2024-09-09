@@ -13,11 +13,12 @@ import {
 } from "~/components/Svgs";
 import { useBoundStore } from "~/hooks/useBoundStore";
 import { useRouter } from "next/router";
-import { TestTask, TestAnswer } from "~/utils/taskData";
+import { TestTask, TestAnswer, CurrentResult } from "~/utils/taskData";
 import { currentUser } from "~/utils/userData";
-import { UserDataUpdate } from "~/utils/backendUtils";
+import { UserDataUpdate, VerifyAnswer } from "~/utils/backendUtils";
 
 const EvalOpenQuestion = () => {
+
   return "string";
 };
 
@@ -63,7 +64,7 @@ const lessonProblem4 = {
 } as const;
 
 const lessonProblem5 = {
-  id: '2d7a6f58d8c41eb9bd2726306620065',
+  id: 'f2d7a6f58d8c41eb9bd2726306620065',
   type: "OPEN",
   question: `Write code which declares two integer objects of values 6 and 9 respectively, and then prints the greater value.`,
   explanation: ""
@@ -122,6 +123,8 @@ const chooseProblems = () => {
 }
 
 var openAnswer:string = "";
+var explain: string | null = null;
+
 const Lesson: NextPage = () => {
   chooseProblems();
   const router = useRouter();
@@ -156,8 +159,18 @@ const Lesson: NextPage = () => {
     ? numbersEqual(selectedAnswers, correctAnswer)
     : selectedAnswer === correctAnswer;
 
-  const onCheckAnswerOpen = () => {
-    const isOpenAnswerCorrect = true;
+  const [ifCheckAnswerFailed, checkAnswerFails] = useState(false);
+
+  const onCheckAnswerOpen = (TaskID: string) => {
+    checkAnswerFails(false);
+    var isOpenAnswerCorrect = false;
+
+    VerifyAnswer(TaskID, openAnswer).then((ifSucceeded) => {
+      if (ifSucceeded)
+        isOpenAnswerCorrect = CurrentResult.ifCorrect;
+      else
+        checkAnswerFails(true);
+    })
 
     setCorrectAnswerShown(true);
     if (isOpenAnswerCorrect) {
@@ -170,7 +183,7 @@ const Lesson: NextPage = () => {
       {
         question: problem.question!,
         yourResponse: openAnswer,
-        correctResponse: EvalOpenQuestion(),
+        correctResponse: isOpenAnswerCorrect ? openAnswer : "",
       },
     ]);
   }
@@ -312,13 +325,11 @@ const Lesson: NextPage = () => {
           problem={problem}
           correctAnswerCount={correctAnswerCount}
           totalCorrectAnswersNeeded={totalCorrectAnswersNeeded}
-          selectedAnswers={selectedAnswers}
-          setSelectedAnswers={setSelectedAnswers}
           quitMessageShown={quitMessageShown}
           correctAnswerShown={correctAnswerShown}
           setQuitMessageShown={setQuitMessageShown}
           isAnswerCorrect={isAnswerCorrect}
-          onCheckAnswer={onCheckAnswerOpen}
+          onCheckAnswer={() => onCheckAnswerOpen(problem.id)}
           onFinish={onFinish}
           onSkip={onSkip}
           hearts={hearts}
@@ -747,8 +758,6 @@ const ProblemOpen = ({
   problem,
   correctAnswerCount,
   totalCorrectAnswersNeeded,
-  selectedAnswers,
-  setSelectedAnswers,
   quitMessageShown,
   correctAnswerShown,
   setQuitMessageShown,
@@ -761,8 +770,6 @@ const ProblemOpen = ({
   problem: typeof lessonProblem4;
   correctAnswerCount: number;
   totalCorrectAnswersNeeded: number;
-  selectedAnswers: number[];
-  setSelectedAnswers: React.Dispatch<React.SetStateAction<number[]>>;
   correctAnswerShown: boolean;
   quitMessageShown: boolean;
   setQuitMessageShown: React.Dispatch<React.SetStateAction<boolean>>;
@@ -773,9 +780,8 @@ const ProblemOpen = ({
   hearts: number | null;
 }) => {
   const { question, explanation, id } = problem;
-  const answerInput = {
-    text: ""
-  };
+  const [answerInput, setAnswerInput] = useState("");
+  openAnswer = "";
 
   return (
     <div className="text-white bg-darker-purple flex min-h-screen flex-col gap-5 px-4 py-5 sm:px-0 sm:py-0">
@@ -790,7 +796,7 @@ const ProblemOpen = ({
         </div>
         <section className="flex max-w-2xl grow flex-col gap-6 self-center sm:items-center sm:justify-center sm:gap-24">
           <h1 className="mb-2 text-2xl font-bold sm:text-3xl">
-            write some code UwU
+            write some code UwU (powered by AI)
           </h1>
 
           <div className="w-full">
@@ -805,7 +811,7 @@ const ProblemOpen = ({
                 placeholder="write your answer here"
                 rows={8}
                 cols={100}
-                onChange={(e) => {answerInput.text = e.target.value!;}}
+                onChange={(e) => {setAnswerInput(e.target.value!);}}
               />
 
           <div className="flex flex-wrap justify-center gap-1">
@@ -817,9 +823,9 @@ const ProblemOpen = ({
         correctAnswer={null}
         correctAnswerShown={correctAnswerShown}
         isAnswerCorrect={isAnswerCorrect}
-        isAnswerSelected={selectedAnswers.length > 0}
+        isAnswerSelected={answerInput.trim() !== ""}
         onCheckAnswer={() => {
-          openAnswer = answerInput.text!;
+          openAnswer = answerInput;
           onCheckAnswer();
         }}
         onFinish={onFinish}
