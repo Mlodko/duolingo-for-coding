@@ -15,14 +15,18 @@
 ### Multiple choice variant
 ```json
 {
-  "selected_answers": [String]
+  "MultipleChoice": {
+    "selected_answers": [String]
+  }
 }
 ```
 
 ### Open question variant
 ```json
 {
-  "content": String
+  "OpenQuestion": {
+    "content": String
+  }
 }
 ```
 
@@ -30,7 +34,9 @@
 
 ```json
 {
-  "parts": [String]
+  "FromParts": {
+    "parts": [String]
+  }
 }
 ```
 
